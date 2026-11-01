@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Procedure &amp; Function{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Procedure &amp; Function Demo</h1>
+    <p class="muted">Giao diện trình bày kết quả của mục 2.3 và 2.4; không viết truy vấn SQL tại route.</p>
+  </div>
+  <span class="badge">A2 · 3.3</span>
+</div>
+<div class="alert alert-info">
+  Các form đã có sẵn để nhóm nối với stored procedures/functions sau khi hoàn thiện SQL và service layer.
+  Màn hình vẫn truy cập được trước khi kết nối database.
+</div>
+
+<section class="card">
+  <h2>Procedure 2.3 – Doanh thu theo Shipper</h2>
+  <p class="muted">Procedure phải JOIN ít nhất hai bảng và có WHERE, aggregate functions, GROUP BY, HAVING, ORDER BY.</p>
+  <form method="post" class="inline-form">
+    <input type="hidden" name="action" value="revenue">
+    <div class="field"><label for="from_date">Từ ngày *</label><input id="from_date" type="date" name="from_date" required></div>
+    <div class="field"><label for="to_date">Đến ngày *</label><input id="to_date" type="date" name="to_date" required></div>
+    <div class="field"><label for="min_orders">Số đơn tối thiểu</label><input id="min_orders" type="number" name="min_orders" min="0" value="0"></div>
+    <div class="field actions"><button class="btn btn-primary" type="submit">Chạy báo cáo</button></div>
+  </form>
+  {% if revenue is not none %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Shipper</th><th>Số đơn</th><th>Tổng cước</th><th>Hoa hồng</th><th>Thu nhập ròng</th></tr></thead>
+        <tbody>{% for row in revenue %}<tr>
+          <td>{{ row.ShipperName or row.ShipperID }}</td><td>{{ row.TotalOrders }}</td>
+          <td>{{ row.TotalDeliveryFee|vnd }}</td><td>{{ row.TotalCommission|vnd }}</td><td>{{ row.TotalNetEarning|vnd }}</td>
+        </tr>{% else %}<tr><td class="empty" colspan="5">Không có kết quả.</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
+
+<div class="two-col">
+  <section class="card">
+    <h2>Function 2.4 – Điểm uy tín</h2>
+    <p class="muted">Cursor duyệt Feedback do Customer gửi về Shipper; không tính feedback do Shipper gửi.</p>
+    <form method="post" class="stack">
+      <input type="hidden" name="action" value="reputation">
+      <div class="field"><label for="rep_id">Shipper UserID *</label><input id="rep_id" name="shipper_id" type="number" min="1" required></div>
+      <button class="btn btn-primary" type="submit">Tính điểm</button>
+    </form>
+    {% if reputation is not none %}<div class="result">Điểm uy tín: <strong>{{ reputation }}</strong> / 5</div>{% endif %}
+  </section>
+  <section class="card">
+    <h2>Function 2.4 – Tiền thưởng</h2>
+    <p class="muted">Cursor duyệt SHIPPER_EARNING, cộng thu nhập ròng và dùng IF/ELSEIF để chọn mức thưởng.</p>
+    <form method="post" class="stack">
+      <input type="hidden" name="action" value="bonus">
+      <div class="field"><label for="bonus_id">Shipper UserID *</label><input id="bonus_id" name="shipper_id" type="number" min="1" required></div>
+      <div class="field"><label for="bonus_from">Từ ngày *</label><input id="bonus_from" type="date" name="from_date" required></div>
+      <div class="field"><label for="bonus_to">Đến ngày *</label><input id="bonus_to" type="date" name="to_date" required></div>
+      <button class="btn btn-primary" type="submit">Tính thưởng</button>
+    </form>
+    {% if bonus is not none %}<div class="result">Tiền thưởng: <strong>{{ bonus|vnd }}</strong></div>{% endif %}
+  </section>
+</div>
+{% endblock %}

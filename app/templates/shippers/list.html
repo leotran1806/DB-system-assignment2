@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Quản lý Shipper{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Quản lý Shipper</h1>
+    <p class="muted">Một màn hình cho INSERT, UPDATE, DELETE và danh sách gọi từ <code>sp_ListShippers</code>.</p>
+  </div>
+  <span class="badge">A2 · 3.1 + 3.2</span>
+</div>
+
+<div class="alert alert-info">
+  Đây là bộ khung giao diện. Các thao tác dữ liệu chưa được cài đặt; hoàn thiện TODO trong
+  <code>services/shipper_service.py</code> và các procedure trong <code>database/04_procedures.sql</code>.
+  Giao diện vẫn mở được khi chưa cấu hình MySQL.
+</div>
+
+<section class="card">
+  <h2>Thêm Shipper</h2>
+  <p class="muted">Nhập UserID đã tồn tại trong USER. Khi hiện thực SQL, xác nhận ID chưa được dùng sai vai trò và thỏa các khóa ngoại.</p>
+  <form method="post" action="{{ url_for('shippers.index') }}" class="grid">
+    <div class="field">
+      <label for="user_id">User ID *</label>
+      <input id="user_id" name="user_id" type="number" min="1" required placeholder="Ví dụ: 21">
+    </div>
+    <div class="field">
+      <label for="national_id">National Identification Number *</label>
+      <input id="national_id" name="national_id" required pattern="[0-9]{9}([0-9]{3})?" placeholder="9 hoặc 12 chữ số">
+    </div>
+    <div class="field">
+      <label for="availability_status">Trạng thái làm việc *</label>
+      <select id="availability_status" name="availability_status" required>
+        <option value="offline">Offline</option>
+        <option value="available">Available</option>
+        <option value="busy">Busy</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="join_date">Ngày tham gia *</label>
+      <input id="join_date" name="join_date" type="date" required>
+    </div>
+    <div class="field">
+      <label for="managed_by_admin_id">Admin quản lý (UserID)</label>
+      <input id="managed_by_admin_id" name="managed_by_admin_id" type="number" min="1" placeholder="Có thể để trống">
+    </div>
+    <div class="field actions">
+      <button class="btn btn-primary" type="submit">＋ Thêm Shipper</button>
+    </div>
+  </form>
+</section>
+
+<form class="card filters" method="get" action="{{ url_for('shippers.index') }}">
+  <div class="field grow">
+    <label for="search">Tìm kiếm</label>
+    <input id="search" name="search" value="{{ filters.search }}" placeholder="Tên, email, SĐT hoặc mã định danh">
+  </div>
+  <div class="field">
+    <label for="availability">Trạng thái làm việc</label>
+    <select id="availability" name="availability">
+      <option value="">Tất cả</option>
+      {% for value, label in [('available','Available'),('busy','Busy'),('offline','Offline')] %}
+        <option value="{{ value }}" {{ 'selected' if filters.availability == value else '' }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="account_status">Tài khoản</label>
+    <select id="account_status" name="account_status">
+      <option value="">Tất cả</option>
+      {% for value, label in [('active','Active'),('suspended','Suspended'),('closed','Closed')] %}
+        <option value="{{ value }}" {{ 'selected' if filters.account_status == value else '' }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="vehicle_type">Loại xe</label>
+    <select id="vehicle_type" name="vehicle_type">
+      <option value="">Tất cả</option>
+      {% for value, label in [('motorbike','Motorbike'),('car','Car'),('van','Van'),('truck','Truck')] %}
+        <option value="{{ value }}" {{ 'selected' if filters.vehicle_type == value else '' }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="sort">Sắp xếp</label>
+    <select id="sort" name="sort">
+      {% for key, label in sort_options.items() %}
+        <option value="{{ key }}" {{ 'selected' if filters.sort == key else '' }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field actions">
+    <button class="btn btn-primary" type="submit">Tìm / Lọc</button>
+    <a class="btn" href="{{ url_for('shippers.index') }}">Xóa lọc</a>
+  </div>
+</form>
+
+<section class="card table-wrap">
+  <div class="page-head">
+    <div>
+      <h2>Danh sách Shipper</h2>
+      <p class="muted">{{ rows|length }} bản ghi trả về · cần JOIN tối thiểu USER và SHIPPER, có thể JOIN VEHICLE.</p>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>User ID</th><th>Họ tên</th><th>Liên hệ</th><th>Mã định danh</th>
+        <th>Làm việc</th><th>Tài khoản</th><th>Loại xe</th><th>Đánh giá</th><th>Thao tác</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr>
+        <td>#{{ row.UserID }}</td>
+        <td>{{ row.FullName or '—' }}</td>
+        <td>{{ row.Email or '—' }}<br><small>{{ row.PhoneNumber or '—' }}</small></td>
+        <td>{{ row.NationalIdentificationNumber or '—' }}</td>
+        <td><span class="badge badge-{{ row.AvailabilityStatus or 'offline' }}">{{ row.AvailabilityStatus or '—' }}</span></td>
+        <td><span class="badge badge-{{ row.AccountStatus or 'closed' }}">{{ row.AccountStatus or '—' }}</span></td>
+        <td>{{ row.VehicleType or '—' }}</td>
+        <td>{{ row.AverageRating if row.AverageRating is not none else '—' }}</td>
+        <td class="nowrap">
+          <details>
+            <summary class="btn btn-sm">Sửa ngay</summary>
+            <form method="post" action="{{ url_for('shippers.update', user_id=row.UserID) }}" class="inline-edit">
+              <div class="field"><label>National ID</label><input name="national_id" required value="{{ row.NationalIdentificationNumber or '' }}"></div>
+              <div class="field"><label>Trạng thái</label>
+                <select name="availability_status">
+                  {% for value in ['available','busy','offline'] %}<option value="{{ value }}" {{ 'selected' if row.AvailabilityStatus == value else '' }}>{{ value }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="field"><label>Ngày tham gia</label><input type="date" name="join_date" value="{{ row.JoinDate or '' }}" required></div>
+              <div class="field"><label>Admin UserID</label><input type="number" min="1" name="managed_by_admin_id" value="{{ row.ManagedByAdminID or '' }}"></div>
+              <button class="btn btn-primary btn-sm" type="submit">Lưu</button>
+            </form>
+          </details>
+          <form method="post" action="{{ url_for('shippers.delete', user_id=row.UserID) }}" class="inline" onsubmit="return confirm('Xác nhận xóa/ngừng hoạt động Shipper này?');">
+            <button class="btn btn-danger btn-sm" type="submit">Xóa</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="9" class="empty">
+        Chưa có dữ liệu để hiển thị. Hãy hoàn thiện <code>sp_ListShippers</code> và hàm service tương ứng.
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

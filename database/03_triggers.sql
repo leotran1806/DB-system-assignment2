@@ -1,0 +1,97 @@
+-- ============================================================================
+-- 03_triggers.sql | A2 - Section 2.2 (1 point)
+-- STARTER FILE: implement one business-constraint trigger set and one
+-- derived-attribute trigger set. Test them with the scripts in database/tests.
+-- ============================================================================
+USE parcel_delivery;
+
+-- ---------------------------------------------------------------------------
+-- 2.2.1 BUSINESS CONSTRAINT CHOSEN FROM A1: constraint #4
+-- "At any given time, a DELIVERY_ORDER must not have more than one active
+-- DELIVERY_ASSIGNMENT." Define active explicitly; this starter assumes
+-- AssignmentStatus='accepted' means active.
+--
+-- Required DML operations that can violate it:
+--   * INSERT into DELIVERY_ASSIGNMENT with AssignmentStatus='accepted'.
+--   * UPDATE of DELIVERY_ASSIGNMENT.OrderID or AssignmentStatus so a row becomes
+--     accepted or moves to an order that already has an accepted assignment.
+--   * DELETE does not create this violation, so explain why no DELETE trigger is
+--     needed for this chosen constraint.
+--
+-- TODO:
+-- 1. Create a BEFORE INSERT trigger on DELIVERY_ASSIGNMENT.
+-- 2. If NEW.AssignmentStatus='accepted', count existing accepted rows with the
+--    same OrderID. If count > 0, SIGNAL SQLSTATE '45000' with a clear message.
+-- 3. Create a BEFORE UPDATE trigger. Apply the same check, but exclude the row
+--    identified by OLD.OrderID + OLD.AssignmentNo. Also check changes to OrderID.
+-- 4. Consider NULLs and the exact composite primary key in your schema.
+-- 5. Do not use a trigger for a rule already enforced by a simple table CHECK.
+--
+-- Template (complete the TODOs and remove the comment markers before running):
+-- DELIMITER $$
+-- CREATE TRIGGER trg_assignment_bi
+-- BEFORE INSERT ON DELIVERY_ASSIGNMENT
+-- FOR EACH ROW
+-- BEGIN
+--     -- TODO: IF NEW.AssignmentStatus = 'accepted' THEN
+--     --   SELECT COUNT(*) ... WHERE OrderID = NEW.OrderID
+--     --     AND AssignmentStatus = 'accepted';
+--     --   IF count > 0 THEN SIGNAL SQLSTATE '45000'
+--     --     SET MESSAGE_TEXT = 'Order already has an active assignment'; END IF;
+--     -- END IF;
+-- END$$
+--
+-- CREATE TRIGGER trg_assignment_bu
+-- BEFORE UPDATE ON DELIVERY_ASSIGNMENT
+-- FOR EACH ROW
+-- BEGIN
+--     -- TODO: repeat the active-assignment check and exclude OLD composite PK.
+-- END$$
+-- DELIMITER ;
+
+-- ---------------------------------------------------------------------------
+-- 2.2.2 DERIVED ATTRIBUTE CHOSEN FROM A1: SHIPPER.AverageRating
+-- Definition from A1: average rating from FEEDBACK submitted by Customers about
+-- the shipper. Feedback submitted by the shipper about the customer is excluded.
+--
+-- DML operations that affect AverageRating:
+--   * INSERT into FEEDBACK (a customer feedback is added).
+--   * UPDATE FEEDBACK (Rating, ShipperID or FeedbackType changes).
+--   * DELETE from FEEDBACK (a customer feedback is removed).
+--
+-- TODO:
+-- 1. Ensure SHIPPER has a stored AverageRating column (e.g. DECIMAL(3,2)).
+-- 2. Create AFTER INSERT, AFTER UPDATE and AFTER DELETE triggers on FEEDBACK.
+-- 3. Recalculate with AVG(Rating) where ShipperID = the affected shipper and
+--    FeedbackType='customer'; use COALESCE(..., 0.00) when no ratings remain.
+-- 4. For UPDATE, recalculate both OLD.ShipperID and NEW.ShipperID if the shipper
+--    association changes. If FeedbackType changes, recalculate affected shipper.
+-- 5. Do not include FeedbackType='shipper' in the average.
+-- 6. Add a test that inserts, changes and deletes feedback and checks the stored
+--    AverageRating after each operation.
+--
+-- Template (complete the TODOs and remove the comment markers before running):
+-- DELIMITER $$
+-- CREATE TRIGGER trg_feedback_ai
+-- AFTER INSERT ON FEEDBACK
+-- FOR EACH ROW
+-- BEGIN
+--     -- TODO: UPDATE SHIPPER SET AverageRating = (SELECT COALESCE(AVG(Rating),0)
+--     --        FROM FEEDBACK WHERE ShipperID=NEW.ShipperID
+--     --        AND FeedbackType='customer') WHERE UserID=NEW.ShipperID;
+-- END$$
+--
+-- CREATE TRIGGER trg_feedback_au
+-- AFTER UPDATE ON FEEDBACK
+-- FOR EACH ROW
+-- BEGIN
+--     -- TODO: recalculate OLD.ShipperID and NEW.ShipperID when applicable.
+-- END$$
+--
+-- CREATE TRIGGER trg_feedback_ad
+-- AFTER DELETE ON FEEDBACK
+-- FOR EACH ROW
+-- BEGIN
+--     -- TODO: recalculate OLD.ShipperID.
+-- END$$
+-- DELIMITER ;
