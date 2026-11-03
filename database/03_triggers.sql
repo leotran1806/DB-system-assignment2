@@ -6,50 +6,26 @@
 USE parcel_delivery;
 
 -- ---------------------------------------------------------------------------
--- 2.2.1 BUSINESS CONSTRAINT CHOSEN FROM A1: constraint #4
--- "At any given time, a DELIVERY_ORDER must not have more than one active
--- DELIVERY_ASSIGNMENT." Define active explicitly; this starter assumes
--- AssignmentStatus='accepted' means active.
---
--- Required DML operations that can violate it:
---   * INSERT into DELIVERY_ASSIGNMENT with AssignmentStatus='accepted'.
---   * UPDATE of DELIVERY_ASSIGNMENT.OrderID or AssignmentStatus so a row becomes
---     accepted or moves to an order that already has an accepted assignment.
---   * DELETE does not create this violation, so explain why no DELETE trigger is
---     needed for this chosen constraint.
---
--- TODO:
--- 1. Create a BEFORE INSERT trigger on DELIVERY_ASSIGNMENT.
--- 2. If NEW.AssignmentStatus='accepted', count existing accepted rows with the
---    same OrderID. If count > 0, SIGNAL SQLSTATE '45000' with a clear message.
--- 3. Create a BEFORE UPDATE trigger. Apply the same check, but exclude the row
---    identified by OLD.OrderID + OLD.AssignmentNo. Also check changes to OrderID.
--- 4. Consider NULLs and the exact composite primary key in your schema.
--- 5. Do not use a trigger for a rule already enforced by a simple table CHECK.
---
--- Template (complete the TODOs and remove the comment markers before running):
--- DELIMITER $$
--- CREATE TRIGGER trg_assignment_bi
--- BEFORE INSERT ON DELIVERY_ASSIGNMENT
--- FOR EACH ROW
--- BEGIN
---     -- TODO: IF NEW.AssignmentStatus = 'accepted' THEN
---     --   SELECT COUNT(*) ... WHERE OrderID = NEW.OrderID
---     --     AND AssignmentStatus = 'accepted';
---     --   IF count > 0 THEN SIGNAL SQLSTATE '45000'
---     --     SET MESSAGE_TEXT = 'Order already has an active assignment'; END IF;
---     -- END IF;
--- END$$
---
--- CREATE TRIGGER trg_assignment_bu
--- BEFORE UPDATE ON DELIVERY_ASSIGNMENT
--- FOR EACH ROW
--- BEGIN
---     -- TODO: repeat the active-assignment check and exclude OLD composite PK.
--- END$$
--- DELIMITER ;
+-- 2.2.1 BUSINESS CONSTRAINT — Duy: A1 #6 (completed status is final).
+-- Replaces the starter suggestion A1 #4 to match Duy's existing implementation.
+-- Business constraint 6: a completed order cannot return to another status.
+-- UPDATE can violate this rule. INSERT has no OLD status; DELETE is outside it.
+-- CHECK cannot compare the previous and new versions of a row.
+DELIMITER $$
+CREATE TRIGGER trg_order_preserve_completed
+BEFORE UPDATE ON DELIVERY_ORDER
+FOR EACH ROW
+BEGIN
+    IF OLD.OrderStatus = 'completed'
+       AND NOT (NEW.OrderStatus <=> 'completed') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Completed order cannot change to another status.';
+    END IF;
+END$$
+DELIMITER ;
 
 -- ---------------------------------------------------------------------------
+
 -- 2.2.2 DERIVED ATTRIBUTE CHOSEN FROM A1: SHIPPER.AverageRating
 -- Definition from A1: average rating from FEEDBACK submitted by Customers about
 -- the shipper. Feedback submitted by the shipper about the customer is excluded.
