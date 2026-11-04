@@ -40,17 +40,75 @@ USE parcel_delivery;
 --   * AccountStatus: active / suspended / closed.
 --   * Gender: male / female / other.
 --   * FirstName and LastName must not be blank.
+-- 1) USER
+CREATE TABLE `USER` (
+    UserID        INT          NOT NULL AUTO_INCREMENT,
+    Email         VARCHAR(100) NOT NULL,
+    PhoneNumber   VARCHAR(10)  NOT NULL,
+    PasswordHash  VARCHAR(255) NOT NULL,
+    AccountStatus VARCHAR(20)  NOT NULL DEFAULT 'active',
+    CreatedDate   DATE         NOT NULL DEFAULT (CURRENT_DATE),
+    DateOfBirth   DATE         NOT NULL,
+    Gender        VARCHAR(10)  NOT NULL,
+    FirstName     VARCHAR(50)  NOT NULL,
+    LastName      VARCHAR(50)  NOT NULL,
+    CONSTRAINT pk_user PRIMARY KEY (UserID),
+    CONSTRAINT uq_user_email UNIQUE (Email),
+    CONSTRAINT uq_user_phone UNIQUE (PhoneNumber),
+    CONSTRAINT chk_user_email
+        CHECK (Email REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'),
+    CONSTRAINT chk_user_phone
+        CHECK (PhoneNumber REGEXP '^0[0-9]{9}$'),
+    CONSTRAINT chk_user_password CHECK (TRIM(PasswordHash) <> ''),
+    CONSTRAINT chk_user_status
+        CHECK (AccountStatus IN ('active', 'suspended', 'closed')),
+    CONSTRAINT chk_user_gender CHECK (Gender IN ('male', 'female')),
+    CONSTRAINT chk_user_firstname CHECK (TRIM(FirstName) <> ''),
+    CONSTRAINT chk_user_lastname CHECK (TRIM(LastName) <> ''),
+    CONSTRAINT chk_user_dob CHECK (DateOfBirth < CreatedDate)
+) ENGINE = InnoDB;
+ 
 
 -- 2) ADMIN
 -- TODO: CREATE TABLE ADMIN.
 -- Required attributes: UserID (PK and FK -> USER), EmployeeCode (UNIQUE),
 -- Department, AccessLevel, HireDate, Supervisor_ID (self-referencing FK -> ADMIN).
 -- Constraints: AccessLevel 1..3; an admin cannot supervise themself.
+-- 2) ADMIN  
+CREATE TABLE ADMIN (
+    UserID        INT         NOT NULL,
+    EmployeeCode  VARCHAR(20) NOT NULL,
+    Department    VARCHAR(50) NOT NULL,
+    AccessLevel   TINYINT     NOT NULL,
+    HireDate      DATE        NOT NULL,
+    Supervisor_ID INT         NULL,
+    CONSTRAINT pk_admin PRIMARY KEY (UserID),
+    CONSTRAINT uq_admin_employee_code UNIQUE (EmployeeCode),
+    CONSTRAINT fk_admin_user FOREIGN KEY (UserID)
+        REFERENCES `USER` (UserID) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_admin_supervisor FOREIGN KEY (Supervisor_ID)
+        REFERENCES ADMIN (UserID) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT chk_admin_code CHECK (TRIM(EmployeeCode) <> ''),
+    CONSTRAINT chk_admin_department CHECK (TRIM(Department) <> ''),
+    CONSTRAINT chk_admin_level CHECK (AccessLevel BETWEEN 1 AND 3),
+    CONSTRAINT chk_admin_not_self_supervisor CHECK (Supervisor_ID IS NULL OR Supervisor_ID <> UserID),
+    INDEX idx_admin_supervisor (Supervisor_ID)
+) ENGINE = InnoDB;
 
 -- 3) CUSTOMER
 -- TODO: CREATE TABLE CUSTOMER.
 -- Required attributes: UserID (PK and FK -> USER), LoyaltyPoint.
 -- Constraint: LoyaltyPoint >= 0.
+-- 3) CUSTOMER
+CREATE TABLE CUSTOMER (
+    UserID       INT NOT NULL,
+    LoyaltyPoint INT NOT NULL DEFAULT 0,
+    CONSTRAINT pk_customer PRIMARY KEY (UserID),
+    CONSTRAINT fk_customer_user FOREIGN KEY (UserID)
+        REFERENCES `USER` (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_customer_point CHECK (LoyaltyPoint >= 0)
+) ENGINE = InnoDB;
+ 
 
 -- 4) SHIPPER
 -- TODO: CREATE TABLE SHIPPER.
@@ -61,6 +119,27 @@ USE parcel_delivery;
 -- Store AverageRating only if the team intends to maintain it with triggers.
 -- AvailabilityStatus: available / busy / offline.
 -- NationalIdentificationNumber: 9 or 12 digits.
+-- 4) SHIPPER
+CREATE TABLE SHIPPER (
+    UserID                       INT          NOT NULL,
+    NationalIdentificationNumber VARCHAR(12)  NOT NULL,
+    AvailabilityStatus           VARCHAR(20)  NOT NULL DEFAULT 'offline',
+    JoinDate                     DATE         NOT NULL DEFAULT (CURRENT_DATE),
+    ManagedByAdminID             INT          NOT NULL,
+    AverageRating                DECIMAL(3,2) NOT NULL DEFAULT 0.00,
+    CONSTRAINT pk_shipper PRIMARY KEY (UserID),
+    CONSTRAINT uq_shipper_nin UNIQUE (NationalIdentificationNumber),
+    CONSTRAINT fk_shipper_user FOREIGN KEY (UserID)
+        REFERENCES `USER` (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_shipper_admin FOREIGN KEY (ManagedByAdminID)
+        REFERENCES ADMIN (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_shipper_nin
+        CHECK (NationalIdentificationNumber REGEXP '^0[0-9]{11}$'),
+    CONSTRAINT chk_shipper_availability
+        CHECK (AvailabilityStatus IN ('available', 'busy', 'offline')),
+    CONSTRAINT chk_shipper_rating CHECK (AverageRating BETWEEN 0 AND 5),
+    INDEX idx_shipper_availability (AvailabilityStatus)
+) ENGINE = InnoDB;
 
 -- 5) SHIPPER_LICENSE
 -- TODO: CREATE TABLE SHIPPER_LICENSE.
@@ -75,6 +154,28 @@ USE parcel_delivery;
 -- A1 relationship: one vehicle per shipper; make ShipperID UNIQUE.
 -- Constraints: MaximumLoad > 0; LicensePlate UNIQUE and format-validated.
 -- VehicleType: motorbike / car / van / truck.
+-- 6) VEHICLE
+CREATE TABLE VEHICLE (
+    VehicleID    INT           NOT NULL AUTO_INCREMENT,
+    ShipperID    INT           NOT NULL,
+    Brand        VARCHAR(50)   NOT NULL,
+    Model        VARCHAR(50)   NOT NULL,
+    LicensePlate VARCHAR(15)   NOT NULL,
+    Color        VARCHAR(30)   NOT NULL,
+    MaximumLoad  DECIMAL(8,2)  NOT NULL,
+    VehicleType  VARCHAR(20)   NOT NULL,
+    CONSTRAINT pk_vehicle PRIMARY KEY (VehicleID),
+    CONSTRAINT uq_vehicle_shipper UNIQUE (ShipperID),
+    CONSTRAINT uq_vehicle_plate UNIQUE (LicensePlate),
+    CONSTRAINT fk_vehicle_shipper FOREIGN KEY (ShipperID)
+        REFERENCES SHIPPER (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_vehicle_load CHECK (MaximumLoad > 0),
+    CONSTRAINT chk_vehicle_plate
+        CHECK (LicensePlate REGEXP '^[0-9]{2}-?[A-Z][A-Z0-9]?[ -]?[0-9]{3}\\.?[0-9]{2}$'),
+    CONSTRAINT chk_vehicle_type
+        CHECK (VehicleType IN ('motorbike', 'car', 'van', 'truck')),
+    INDEX idx_vehicle_type (VehicleType)
+) ENGINE = InnoDB;
 
 -- 7) DELIVERY_ORDER
 -- TODO: CREATE TABLE DELIVERY_ORDER.
