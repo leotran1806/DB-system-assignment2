@@ -190,15 +190,33 @@ SELECT 'vehicle of shipper 22 removed' AS Check2, COUNT(*) AS Total FROM VEHICLE
 --      ORDER BY ...;
 -- END$$
 --
+DROP PROCEDURE IF EXISTS sp_RevenueByShipper$$
 CREATE PROCEDURE sp_RevenueByShipper(IN fromDate DATE, IN toDate DATE, IN minOrders INT)
 BEGIN
-    IF fromDate is NULL or toDate is NULL THEN:
+    IF fromDate is NULL or toDate is NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This field cannot be NULL';
-    IF fromDate > toDate THEN:
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "From date cannot be after to date"
+    END IF;
+    IF fromDate > toDate THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "From date cannot be after to date";
+    END IF;
     IF minOrders is NULL OR minOrders < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Minimum orders not be NULL or negative'
-    SELECT u.id
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Minimum orders not be NULL or negative';
+    END IF;
+    SELECT u.UserID AS ShipperID,
+           CONCAT(u.LastName, ' ', u.FirstName) AS ShipperName,
+           COUNT(se.EarningID) AS TotalOrders,
+           SUM(se.DeliveryFee) AS TotalDeliveryFee,
+           SUM(se.PlatformCommission) AS TotalCommission,
+           SUM(se.DeliveryFee - se.PlatformCommission) AS TotalNetEarning
+        FROM `USER` u 
+        JOIN SHIPPER s ON u.UserID = s.UserID
+        JOIN SHIPPER_EARNING se ON u.UserID = se.ShipperID
+        WHERE se.EarningDate >= fromDate AND se.EarningDate < DATE_ADD(toDate, INTERVAL 1 DAY)
+        GROUP BY u.UserID, u.LastName, u.FirstName
+        HAVING COUNT(se.EarningID) >= minOrders
+        ORDER BY ShipperID ASC;
+END$$
+DELIMETER ;
 -- CREATE PROCEDURE sp_RevenueByShipper(IN p_FromDate DATE, ...)
 -- BEGIN
 --     SELECT ..., COUNT(...), SUM(...)
