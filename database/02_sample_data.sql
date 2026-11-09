@@ -45,11 +45,13 @@ USE parcel_delivery;
 --        Include percentage/fixed discounts, active/inactive/expired states,
 --        valid date windows, minimum values and distinct usage limits.
 
--- TODO 8: INSERT >= 5 DELIVERY_ORDER rows.
---        Use existing CustomerID values. Include placed/accepted/delivering/
---        completed/cancelled cases. Every cancelled row needs a reason. Respect
---        CompleteDate rules. If derived fee/discount/price are stored, seed them
---        consistently or allow triggers to derive them.
+-- 8: Duy — requires CUSTOMER IDs 91001..91005 from group A.
+INSERT INTO DELIVERY_ORDER (OrderID, CustomerID, PickupAddressDetail, PickupDistrict, PickupProvinceCity, DeliveryAddressDetail, DeliveryDistrict, DeliveryProvinceCity, CreatedDate, ServiceType, PickupContactName, PickupContactPhone, DeliveryContactName, DeliveryContactPhone, Distance, CODAmount, OrderStatus, Note, CompleteDate, CancellationReason) VALUES
+(92001,91001,'123 Nguyen Van Cu','District 5','Ho Chi Minh City','268 Ly Thuong Kiet','District 10','Ho Chi Minh City','2026-11-01 08:00:00','Standard','Sender 1','0901234501','Receiver 1','0911234501',5.50,100000,'placed','Demo order 1',NULL,NULL),
+(92002,91002,'123 Nguyen Van Cu','District 5','Ho Chi Minh City','268 Ly Thuong Kiet','District 10','Ho Chi Minh City','2026-11-01 08:00:00','Standard','Sender 2','0901234502','Receiver 2','0911234502',5.50,100000,'accepted','Demo order 2',NULL,NULL),
+(92003,91003,'123 Nguyen Van Cu','District 5','Ho Chi Minh City','268 Ly Thuong Kiet','District 10','Ho Chi Minh City','2026-11-01 08:00:00','Standard','Sender 3','0901234503','Receiver 3','0911234503',5.50,100000,'delivering','Demo order 3',NULL,NULL),
+(92004,91004,'123 Nguyen Van Cu','District 5','Ho Chi Minh City','268 Ly Thuong Kiet','District 10','Ho Chi Minh City','2026-11-01 08:00:00','Standard','Sender 4','0901234504','Receiver 4','0911234504',5.50,100000,'completed','Demo order 4','2026-11-01 11:00:00',NULL),
+(92005,91005,'123 Nguyen Van Cu','District 5','Ho Chi Minh City','268 Ly Thuong Kiet','District 10','Ho Chi Minh City','2026-11-01 08:00:00','Standard','Sender 5','0901234505','Receiver 5','0911234505',5.50,100000,'cancelled','Demo order 5',NULL,'Customer requested cancellation');
 
 -- TODO 9: INSERT >= 5 PACKAGE rows.
 --        Link to existing orders; use meaningful descriptions/categories and
@@ -59,9 +61,21 @@ USE parcel_delivery;
 --         Include offered/rejected/accepted/completed statuses and valid dates.
 --         Do not seed two simultaneously active assignments for one order.
 --
--- TODO 11: INSERT >= 5 ORDER_STATUS_LOG rows.
---         The latest status for each order must match DELIVERY_ORDER.OrderStatus.
---
+-- 11: Duy — requires USER IDs 91001..91005 from group A.
+INSERT INTO ORDER_STATUS_LOG (StatusLogID,OrderID,ChangedByUserID,Status,ChangedDate,Note) VALUES
+(93001,92001,91001,'placed','2026-11-01 08:00:00','Demo status history'),
+(93002,92002,91002,'placed','2026-11-01 08:00:00','Demo status history'),
+(93003,92002,91002,'accepted','2026-11-01 09:00:00','Demo status history'),
+(93004,92003,91003,'placed','2026-11-01 08:00:00','Demo status history'),
+(93005,92003,91003,'accepted','2026-11-01 09:00:00','Demo status history'),
+(93006,92003,91003,'delivering','2026-11-01 10:00:00','Demo status history'),
+(93007,92004,91004,'placed','2026-11-01 08:00:00','Demo status history'),
+(93008,92004,91004,'accepted','2026-11-01 09:00:00','Demo status history'),
+(93009,92004,91004,'delivering','2026-11-01 10:00:00','Demo status history'),
+(93010,92004,91004,'completed','2026-11-01 11:00:00','Demo status history'),
+(93011,92005,91005,'placed','2026-11-01 08:00:00','Demo status history'),
+(93012,92005,91005,'cancelled','2026-11-01 09:00:00','Demo status history');
+
 -- TODO 12: INSERT >= 5 PAYMENT rows.
 --         Each OrderID must be unique if the one-payment-per-order rule is used.
 --         Use values allowed by the CHECK constraints.
@@ -85,3 +99,7 @@ USE parcel_delivery;
 
 -- TODO: after inserting all rows, write SELECT COUNT(*) checks for all 16
 -- tables and verify every count is >= 5 before the presentation.
+
+-- Duy: verify group B row counts (expected 5 orders, 12 status logs).
+SELECT COUNT(*) AS DeliveryOrderCount FROM DELIVERY_ORDER;
+SELECT COUNT(*) AS OrderStatusLogCount FROM ORDER_STATUS_LOG;

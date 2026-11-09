@@ -76,20 +76,41 @@ USE parcel_delivery;
 -- Constraints: MaximumLoad > 0; LicensePlate UNIQUE and format-validated.
 -- VehicleType: motorbike / car / van / truck.
 
--- 7) DELIVERY_ORDER
--- TODO: CREATE TABLE DELIVERY_ORDER.
--- Required attributes from A1:
---   OrderID (PK), CustomerID (FK -> CUSTOMER), PickupAddressDetail,
---   PickupDistrict, PickupProvinceCity, DeliveryAddressDetail, DeliveryDistrict,
---   DeliveryProvinceCity, CreatedDate, ServiceType, PickupContactName,
---   PickupContactPhone, DeliveryContactName, DeliveryContactPhone, Distance,
---   CODAmount, OrderStatus, Note, CompleteDate, CancellationReason.
--- If storing A1 derived attributes, document the design choice and add:
---   DeliveryFee, TotalDiscountAmount, FinalPrice.
--- Constraints to consider: Distance > 0; CODAmount >= 0; valid contact phones;
--- cancelled order requires CancellationReason; completed order requires
--- CompleteDate and non-completed order must not have CompleteDate.
--- ServiceType and OrderStatus must use the values adopted from A1.
+-- 7) DELIVERY_ORDER — Duy
+-- Dependencies: CUSTOMER.UserID and USER.UserID must be signed INT.
+CREATE TABLE DELIVERY_ORDER (
+    OrderID INT PRIMARY KEY,
+    CustomerID INT NOT NULL,
+    PickupAddressDetail VARCHAR(255) NOT NULL,
+    PickupDistrict VARCHAR(100) NOT NULL,
+    PickupProvinceCity VARCHAR(100) NOT NULL,
+    DeliveryAddressDetail VARCHAR(255) NOT NULL,
+    DeliveryDistrict VARCHAR(100) NOT NULL,
+    DeliveryProvinceCity VARCHAR(100) NOT NULL,
+    CreatedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ServiceType VARCHAR(30) NOT NULL,
+    PickupContactName VARCHAR(100) NOT NULL,
+    PickupContactPhone VARCHAR(20) NOT NULL,
+    DeliveryContactName VARCHAR(100) NOT NULL,
+    DeliveryContactPhone VARCHAR(20) NOT NULL,
+    Distance DECIMAL(10,2) NOT NULL,
+    CODAmount DECIMAL(15,2) NOT NULL DEFAULT 0,
+    OrderStatus VARCHAR(20) NOT NULL DEFAULT 'placed',
+    Note VARCHAR(500),
+    CompleteDate DATETIME,
+    CancellationReason VARCHAR(500),
+    CONSTRAINT fk_order_customer FOREIGN KEY (CustomerID) REFERENCES CUSTOMER(UserID),
+    CONSTRAINT ck_order_distance CHECK (Distance >= 0),
+    CONSTRAINT ck_order_cod CHECK (CODAmount >= 0),
+    CONSTRAINT ck_order_status CHECK (OrderStatus IN ('placed','accepted','delivering','completed','cancelled')),
+    CONSTRAINT ck_order_completion CHECK (
+        (OrderStatus = 'completed' AND CompleteDate IS NOT NULL AND CompleteDate >= CreatedDate)
+        OR (OrderStatus <> 'completed' AND CompleteDate IS NULL)),
+    CONSTRAINT ck_order_cancel_reason CHECK (
+        OrderStatus <> 'cancelled' OR
+        (CancellationReason IS NOT NULL AND CHAR_LENGTH(TRIM(CancellationReason)) > 0)),
+    INDEX ix_order_status_created (OrderStatus, CreatedDate)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 8) PACKAGE
 -- TODO: CREATE TABLE `PACKAGE`.
@@ -108,11 +129,19 @@ USE parcel_delivery;
 --   AcceptedDate >= AssignedDate; CompleteDate >= AcceptedDate.
 -- AssignmentStatus values must follow A1.
 
--- 10) ORDER_STATUS_LOG
--- TODO: CREATE TABLE ORDER_STATUS_LOG.
--- Required attributes: StatusLogID (PK), OrderID (FK -> DELIVERY_ORDER),
--- ChangedByUserID (FK -> USER), Status, ChangedDate, Note.
--- The latest log status must match DELIVERY_ORDER.OrderStatus (cross-table rule).
+-- 10) ORDER_STATUS_LOG — Duy
+CREATE TABLE ORDER_STATUS_LOG (
+    StatusLogID INT PRIMARY KEY,
+    OrderID INT NOT NULL,
+    ChangedByUserID INT NOT NULL,
+    Status VARCHAR(20) NOT NULL,
+    ChangedDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Note VARCHAR(500),
+    CONSTRAINT fk_status_order FOREIGN KEY (OrderID) REFERENCES DELIVERY_ORDER(OrderID),
+    CONSTRAINT fk_status_user FOREIGN KEY (ChangedByUserID) REFERENCES `USER`(UserID),
+    CONSTRAINT ck_log_status CHECK (Status IN ('placed','accepted','delivering','completed','cancelled')),
+    INDEX ix_log_order_date (OrderID, ChangedDate, StatusLogID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 11) PAYMENT
 -- TODO: CREATE TABLE PAYMENT.
