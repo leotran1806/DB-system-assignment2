@@ -17,29 +17,93 @@ USE parcel_delivery;
 -- of the same values. Include different statuses and boundary cases so the
 -- CHECK constraints, triggers, procedures and functions can be demonstrated.
 
--- TODO 1: INSERT >= 5 USER rows.
---        Include valid unique emails/phones and accounts in active/suspended/
---        closed states, while preserving the A1 disjoint/total role specialization.
+-- ============================================================================
+-- TODO 1: USER (28 rows). Roles are disjoint: each UserID 1-25 belongs to exactly one subclass.
+--         26-28 have no role yet; they are the candidates used to demonstrate sp_InsertShipper.
+INSERT INTO `USER` (UserID, Email, PhoneNumber, PasswordHash, AccountStatus, CreatedDate, DateOfBirth, Gender, FirstName, LastName) VALUES
+(1, 'an.nguyen@parceldelivery.vn', '0901000001', SHA2('Password@123', 256), 'active', '2024-01-10', '1980-05-12', 'male', 'An', 'Nguyễn Văn'),
+(2, 'binh.tran@parceldelivery.vn', '0901000002', SHA2('Password@123', 256), 'active', '2024-02-15', '1985-09-03', 'female', 'Bình', 'Trần Thị'),
+(3, 'cuong.le@parceldelivery.vn', '0901000003', SHA2('Password@123', 256), 'active', '2024-03-01', '1983-11-21', 'male', 'Cường', 'Lê Quốc'),
+(4, 'dung.pham@parceldelivery.vn', '0901000004', SHA2('Password@123', 256), 'active', '2024-06-20', '1990-02-14', 'female', 'Dung', 'Phạm Thùy'),
+(5, 'khang.hoang@parceldelivery.vn', '0901000005', SHA2('Password@123', 256), 'suspended', '2024-08-05', '1992-07-30', 'male', 'Khang', 'Hoàng Gia'),
+(6, 'lan.nguyen@mail.com', '0912000006', SHA2('Password@123', 256), 'active', '2025-01-05', '1995-03-18', 'female', 'Lan', 'Nguyễn Thị'),
+(7, 'hung.vo@mail.com', '0912000007', SHA2('Password@123', 256), 'active', '2025-01-12', '1990-08-25', 'male', 'Hùng', 'Võ Mạnh'),
+(8, 'mai.dang@mail.com', '0912000008', SHA2('Password@123', 256), 'active', '2025-02-03', '1998-12-02', 'female', 'Mai', 'Đặng Thị'),
+(9, 'tuan.bui@mail.com', '0912000009', SHA2('Password@123', 256), 'active', '2025-02-20', '1988-06-09', 'male', 'Tuấn', 'Bùi Anh'),
+(10, 'hoa.ngo@mail.com', '0912000010', SHA2('Password@123', 256), 'active', '2025-03-14', '2001-01-27', 'female', 'Hoa', 'Ngô Thị'),
+(11, 'nam.do@mail.com', '0912000011', SHA2('Password@123', 256), 'active', '2025-04-02', '1993-10-11', 'male', 'Nam', 'Đỗ Hoàng'),
+(12, 'thao.vu@mail.com', '0912000012', SHA2('Password@123', 256), 'active', '2025-05-19', '1997-04-30', 'female', 'Thảo', 'Vũ Phương'),
+(13, 'long.dinh@mail.com', '0912000013', SHA2('Password@123', 256), 'active', '2025-06-08', '2003-09-15', 'male', 'Long', 'Đinh Thanh'),
+(14, 'yen.truong@mail.com', '0912000014', SHA2('Password@123', 256), 'suspended', '2025-07-21', '1994-02-08', 'female', 'Yến', 'Trương Hải'),
+(15, 'quang.ly@mail.com', '0912000015', SHA2('Password@123', 256), 'closed', '2025-08-30', '1989-12-19', 'male', 'Quang', 'Lý Minh'),
+(16, 'phuc.nguyen@mail.com', '0971000016', SHA2('Password@123', 256), 'active', '2025-01-08', '1995-04-10', 'male', 'Phúc', 'Nguyễn Hoàng'),
+(17, 'tai.tran@mail.com', '0971000017', SHA2('Password@123', 256), 'active', '2025-01-20', '1992-09-23', 'male', 'Tài', 'Trần Đức'),
+(18, 'ngoc.le@mail.com', '0971000018', SHA2('Password@123', 256), 'active', '2025-02-10', '1997-06-05', 'female', 'Ngọc', 'Lê Bảo'),
+(19, 'son.pham@mail.com', '0971000019', SHA2('Password@123', 256), 'active', '2025-03-03', '1994-01-17', 'male', 'Sơn', 'Phạm Trường'),
+(20, 'trang.vu@mail.com', '0971000020', SHA2('Password@123', 256), 'active', '2025-03-25', '1999-11-28', 'female', 'Trang', 'Vũ Thu'),
+(21, 'khoa.dang@mail.com', '0971000021', SHA2('Password@123', 256), 'active', '2025-04-12', '1991-07-14', 'male', 'Khoa', 'Đặng Anh'),
+(22, 'huy.bui@mail.com', '0971000022', SHA2('Password@123', 256), 'active', '2025-05-05', '2000-03-02', 'male', 'Huy', 'Bùi Quang'),
+(23, 'linh.ho@mail.com', '0971000023', SHA2('Password@123', 256), 'active', '2025-06-01', '1996-08-19', 'female', 'Linh', 'Hồ Thùy'),
+(24, 'dat.truong@mail.com', '0971000024', SHA2('Password@123', 256), 'suspended', '2025-06-18', '1993-05-26', 'male', 'Đạt', 'Trương Tiến'),
+(25, 'hieu.ly@mail.com', '0971000025', SHA2('Password@123', 256), 'closed', '2025-07-02', '1990-10-08', 'male', 'Hiếu', 'Lý Trung'),
+(26, 'khoa.nguyen@mail.com', '0981000026', SHA2('Password@123', 256), 'active', '2026-10-01', '1998-06-15', 'male', 'Khoa', 'Nguyễn Đăng'),
+(27, 'bao.tran@mail.com', '0981000027', SHA2('Password@123', 256), 'active', '2026-10-15', '2010-03-15', 'male', 'Bảo', 'Trần Gia'),
+(28, 'vy.le@mail.com', '0981000028', SHA2('Password@123', 256), 'suspended', '2026-09-20', '1996-12-01', 'female', 'Vy', 'Lê Khánh');
 
--- TODO 2: INSERT >= 5 ADMIN rows.
---        Make EmployeeCode unique. If using Supervisor_ID, insert supervisors
---        before subordinate admins and avoid self-supervision/cycles.
+-- TODO 2: ADMIN (5 rows). Supervisors are inserted before their subordinates; admin 5 is suspended.
+INSERT INTO ADMIN (UserID, EmployeeCode, Department, AccessLevel, HireDate, Supervisor_ID) VALUES
+(1, 'AD001', 'Operations', 3, '2024-01-10', NULL),
+(2, 'AD002', 'Customer Support', 2, '2024-02-15', 1),
+(3, 'AD003', 'Finance', 2, '2024-03-01', 1),
+(4, 'AD004', 'Technical', 1, '2024-06-20', 2),
+(5, 'AD005', 'Human Resources', 1, '2024-08-05', 3);
 
--- TODO 3: INSERT >= 5 CUSTOMER rows.
---        Include different non-negative LoyaltyPoint balances.
+-- TODO 3: CUSTOMER (10 rows). Customer 14 is suspended and 15 is closed (they must not create new orders).
+-- NOTE: LoyaltyPoint must equal earned minus redeemed points in POINT_TRANSACTION (constraint 15).
+INSERT INTO CUSTOMER (UserID, LoyaltyPoint) VALUES
+(6, 1200),
+(7, 350),
+(8, 0),
+(9, 2500),
+(10, 90),
+(11, 640),
+(12, 150),
+(13, 30),
+(14, 500),
+(15, 0);
 
--- TODO 4: INSERT >= 5 SHIPPER rows.
---        Include available/busy/offline states and valid unique NIN values.
---        If AverageRating is stored, seed it consistently with FEEDBACK or let
---        the derived-attribute trigger calculate it after feedback is inserted.
+-- TODO 4: SHIPPER (10 rows). AverageRating is left at its default 0.00; the trigger of 2.2.2 computes it from FEEDBACK.
+-- Shipper 24 is suspended and 25 is closed, so both are offline. Admin 5 (suspended) manages nobody.
+INSERT INTO SHIPPER (UserID, NationalIdentificationNumber, AvailabilityStatus, JoinDate, ManagedByAdminID) VALUES
+(16, '079095123401', 'available', '2025-01-15', 1),
+(17, '001092234502', 'available', '2025-02-01', 1),
+(18, '048197345603', 'busy', '2025-02-20', 2),
+(19, '092094456704', 'available', '2025-03-10', 2),
+(20, '075199567805', 'offline', '2025-04-01', 3),
+(21, '074091678906', 'busy', '2025-04-20', 3),
+(22, '031200789007', 'available', '2025-05-12', 4),
+(23, '056196890108', 'offline', '2025-06-10', 4),
+(24, '087093901209', 'offline', '2025-06-25', 2),
+(25, '038090012310', 'offline', '2025-07-09', 3);
 
--- TODO 5: INSERT >= 5 SHIPPER_LICENSE rows.
---        Every ShipperID must exist. Include license types that can be used to
---        demonstrate vehicle compatibility and rejected incompatible cases.
+-- TODO 6: VEHICLE (9 rows). One vehicle per shipper; shipper 25 has no vehicle.
+INSERT INTO VEHICLE (VehicleID, ShipperID, Brand, Model, LicensePlate, Color, MaximumLoad, VehicleType) VALUES
+(1, 16, 'Honda', 'Wave Alpha', '59X1-234.56', 'Red', 40, 'motorbike'),
+(2, 17, 'Yamaha', 'Exciter', '29B1-345.67', 'Black', 50, 'motorbike'),
+(3, 18, 'Honda', 'Air Blade', '43E1-456.78', 'White', 45, 'motorbike'),
+(4, 19, 'Honda', 'Vision', '65G1-567.89', 'Blue', 40, 'motorbike'),
+(5, 20, 'Yamaha', 'Sirius', '60B1-678.90', 'Silver', 40, 'motorbike'),
+(6, 21, 'Toyota', 'Vios', '51A-123.45', 'White', 400, 'car'),
+(7, 22, 'Kia', 'Morning', '30E-456.78', 'Silver', 350, 'car'),
+(8, 23, 'Hyundai', 'Solati', '51C-789.01', 'White', 900, 'van'),
+(9, 24, 'Isuzu', 'QKR', '29C-890.12', 'Blue', 1900, 'truck');
 
--- TODO 6: INSERT >= 5 VEHICLE rows.
---        Each ShipperID must be unique if the 1:1 relationship is enforced.
---        Include motorbike/car/van/truck, positive load and unique plate numbers.
+-- Row-count check for this group (each must be >= 5):
+SELECT 'USER' AS TableName, COUNT(*) AS Total FROM `USER`
+UNION ALL SELECT 'ADMIN', COUNT(*) FROM ADMIN
+UNION ALL SELECT 'CUSTOMER', COUNT(*) FROM CUSTOMER
+UNION ALL SELECT 'SHIPPER', COUNT(*) FROM SHIPPER
+UNION ALL SELECT 'VEHICLE', COUNT(*) FROM VEHICLE;
 
 -- TODO 7: INSERT >= 5 PROMOTION rows.
 --        Include percentage/fixed discounts, active/inactive/expired states,
