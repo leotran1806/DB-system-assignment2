@@ -119,6 +119,15 @@ USE parcel_delivery;
 --      ORDER BY ...;
 -- END$$
 --
+CREATE PROCEDURE sp_RevenueByShipper(IN fromDate DATE, IN toDate DATE, IN minOrders INT)
+BEGIN
+    IF fromDate is NULL or toDate is NULL THEN:
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This field cannot be NULL';
+    IF fromDate > toDate THEN:
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "From date cannot be after to date"
+    IF minOrders is NULL OR minOrders < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Minimum orders not be NULL or negative'
+    SELECT u.id
 -- CREATE PROCEDURE sp_RevenueByShipper(IN p_FromDate DATE, ...)
 -- BEGIN
 --     SELECT ..., COUNT(...), SUM(...)
