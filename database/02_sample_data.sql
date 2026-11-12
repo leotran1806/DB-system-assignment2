@@ -86,6 +86,20 @@ INSERT INTO SHIPPER (UserID, NationalIdentificationNumber, AvailabilityStatus, J
 (24, '087093901209', 'offline', '2025-06-25', 2),
 (25, '038090012310', 'offline', '2025-07-09', 3);
 
+-- SHIPPER_LICENSE (11 rows). Shipper 21 holds 2 licences; licence of shipper 19 is expired (demo case).
+INSERT INTO SHIPPER_LICENSE (ShipperID, LicenseNumber, LicenseType, IssueDate, ExpiryDate) VALUES
+(16, '790116000001', 'A1', '2021-05-10', '2031-05-10'),
+(17, '790117000002', 'A2', '2020-08-15', '2030-08-15'),
+(18, '790118000003', 'A1', '2019-02-20', '2029-02-20'),
+(19, '790119000004', 'A1', '2018-06-01', '2026-06-01'),
+(20, '790120000005', 'A2', '2022-01-12', '2032-01-12'),
+(21, '790121000006', 'B1', '2020-09-09', '2030-09-09'),
+(21, '790121000016', 'A1', '2019-04-04', '2029-04-04'),
+(22, '790122000007', 'B2', '2021-11-30', '2031-11-30'),
+(23, '790123000008', 'B2', '2020-03-18', '2030-03-18'),
+(24, '790124000009', 'C',  '2019-07-22', '2029-07-22'),
+(25, '790125000010', 'A1', '2018-10-05', '2028-10-05');
+
 -- TODO 6: VEHICLE (9 rows). One vehicle per shipper; shipper 25 has no vehicle.
 INSERT INTO VEHICLE (VehicleID, ShipperID, Brand, Model, LicensePlate, Color, MaximumLoad, VehicleType) VALUES
 (1, 16, 'Honda', 'Wave Alpha', '59X1-234.56', 'Red', 40, 'motorbike'),
@@ -103,6 +117,7 @@ SELECT 'USER' AS TableName, COUNT(*) AS Total FROM `USER`
 UNION ALL SELECT 'ADMIN', COUNT(*) FROM ADMIN
 UNION ALL SELECT 'CUSTOMER', COUNT(*) FROM CUSTOMER
 UNION ALL SELECT 'SHIPPER', COUNT(*) FROM SHIPPER
+UNION ALL SELECT 'SHIPPER_LICENSE', COUNT(*) FROM SHIPPER_LICENSE
 UNION ALL SELECT 'VEHICLE', COUNT(*) FROM VEHICLE;
 
 -- TODO 7: INSERT >= 5 PROMOTION rows.

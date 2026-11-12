@@ -146,6 +146,24 @@ CREATE TABLE SHIPPER (
 -- Required attributes: ShipperID (FK -> SHIPPER), LicenseNumber, LicenseType.
 -- Use a composite PK appropriate to A1 (ShipperID + LicenseNumber).
 -- LicenseType values in the team's A1 model: A1 / A2 / B1 / B2 / C.
+-- 5) SHIPPER_LICENSE
+CREATE TABLE SHIPPER_LICENSE (
+    ShipperID     INT         NOT NULL,
+    LicenseNumber VARCHAR(12) NOT NULL,
+    LicenseType   VARCHAR(5)  NOT NULL,
+    IssueDate     DATE        NOT NULL,
+    ExpiryDate    DATE        NOT NULL,
+    CONSTRAINT pk_shipper_license PRIMARY KEY (ShipperID, LicenseNumber),
+    CONSTRAINT uq_license_number UNIQUE (LicenseNumber),
+    CONSTRAINT fk_license_shipper FOREIGN KEY (ShipperID)
+        REFERENCES SHIPPER (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_license_type
+        CHECK (LicenseType IN ('A1', 'A2', 'B1', 'B2', 'C')),
+    CONSTRAINT chk_license_number
+        CHECK (LicenseNumber REGEXP '^[0-9]{9,12}$'),
+    CONSTRAINT chk_license_dates CHECK (ExpiryDate > IssueDate),
+    INDEX idx_license_expiry (ExpiryDate)
+) ENGINE = InnoDB;
 
 -- 6) VEHICLE
 -- TODO: CREATE TABLE VEHICLE.
