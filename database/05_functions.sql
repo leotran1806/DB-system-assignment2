@@ -34,7 +34,60 @@ USE parcel_delivery;
 -- 6. Thresholds and rates are NOT specified by A1. Agree on values as a team,
 --    document the assumption in the report, and use the same values in sample data.
 -- 7. Return the calculated bonus and add SELECT tests for lower/middle/upper tiers.
+DELIMITER $$
+CREATE FUNCTION fn_ShipperBonus(shipperID INT, fromDate DATE, toDate DATE)
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE done INT DEFAULT 0;
+    DECLARE exist INT DEFAULT 1;
+    DECLARE fee DECIMAL(12,2);
+    DECLARE commission DECIMAL (12,2);
+    DECLARE net DECIMAL(12,2) DEFAULT 0;
+    DECLARE rate DECIMAL(2,1) DEFAULT 0;
+    DECLARE shipperCursor CURSOR FOR
+        SELECT DeliveryFee, PlatformCommission FROM SHIPPER_EARNING
+        WHERE ShipperID = shipperID
+        AND EarningDate >= fromDate
+        AND EarningDate < DATE_ADD(toDate, INTERVAL 1 DAY);
+    DECLARE CONTINUE HANDLER FOR NOT FOUND
+        SET done = 1;
+    
+    IF shipperID IS NULL OR shipperID < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This field cannot be empty';
+    END IF;
+    IF fromDate IS NULL OR toDate IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This field cannot be empty';
+    END IF;
+    IF fromDate > toDate THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'From date cannot be after to date';
+    END IF;
+    
+    SELECT COUNT(*) INTO exist FROM SHIPPER WHERE UserID = shipperID;
+    IF exist = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot find the corresponding shipper';
+    END IF;
 
+    OPEN shipperCursor;
+    earn_loop: LOOP
+        FETCH shipperCursor INTO fee, commission;
+        IF done = 1 THEN
+            LEAVE earn_loop;
+        END IF;
+        SET net = net + (fee - commission);
+    END LOOP;
+    CLOSE shipperCursor;
+
+    IF net >= POWER(10, 7) THEN
+        SET rate = 0.1;
+    ELSEIF net >= 5 * POWER(10, 6) THEN
+        SET rate = 0.05;
+    ELSE
+        SET rate = 0;
+    END IF;
+    RETURN ROUND(net * rate, 0);
+END$$
+DELIMITER ;
 -- Template skeleton (uncomment and complete):
 -- DELIMITER $$
 -- CREATE FUNCTION fn_ShipperReputation(p_ShipperID INT)

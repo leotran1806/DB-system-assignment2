@@ -194,10 +194,10 @@ DROP PROCEDURE IF EXISTS sp_RevenueByShipper$$
 CREATE PROCEDURE sp_RevenueByShipper(IN fromDate DATE, IN toDate DATE, IN minOrders INT)
 BEGIN
     IF fromDate is NULL or toDate is NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This field cannot be NULL';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This field cannot be empty';
     END IF;
     IF fromDate > toDate THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = "From date cannot be after to date";
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'From date cannot be after to date';
     END IF;
     IF minOrders is NULL OR minOrders < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Minimum orders not be NULL or negative';
