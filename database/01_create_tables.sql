@@ -244,54 +244,165 @@ CREATE TABLE ORDER_STATUS_LOG (
     INDEX ix_log_order_date (OrderID, ChangedDate, StatusLogID)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ============================================================================
+-- GROUP C TABLES: PAYMENTS, PROMOTIONS AND REVIEWS — Lê Tuấn
+-- Tables: PAYMENT, PROMOTION, APPLIED_TO, POINT_TRANSACTION, FEEDBACK, SHIPPER_EARNING
+-- ============================================================================
+
 -- 11) PAYMENT
--- TODO: CREATE TABLE PAYMENT.
--- Required attributes: PaymentID (PK), OrderID (UNIQUE FK -> DELIVERY_ORDER),
--- PaymentMethod, PaidBy, Amount, PaymentStatus, TransactionCode, PaymentDate.
--- A1 stores successful payment records; choose suitable checks for amount,
--- method, payer and status.
+CREATE TABLE PAYMENT (
+    PaymentID       INT           NOT NULL AUTO_INCREMENT,
+    OrderID         INT           NOT NULL,
+    PaymentMethod   VARCHAR(20)   NOT NULL,
+    PaidBy          VARCHAR(20)   NOT NULL,
+    Amount          DECIMAL(15,2) NOT NULL,
+    PaymentStatus   VARCHAR(20)   NOT NULL DEFAULT 'completed',
+    TransactionCode VARCHAR(50)   NOT NULL,
+    PaymentDate     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_payment PRIMARY KEY (PaymentID),
+    CONSTRAINT uq_payment_order UNIQUE (OrderID),
+    CONSTRAINT uq_payment_trans UNIQUE (TransactionCode),
+    CONSTRAINT fk_payment_order FOREIGN KEY (OrderID)
+        REFERENCES DELIVERY_ORDER (OrderID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_payment_method
+        CHECK (PaymentMethod IN ('cash', 'card', 'e_wallet', 'bank_transfer')),
+    CONSTRAINT chk_payment_paidby
+        CHECK (PaidBy IN ('sender', 'recipient')),
+    CONSTRAINT chk_payment_amount
+        CHECK (Amount > 0),
+    CONSTRAINT chk_payment_status
+        CHECK (PaymentStatus IN ('completed', 'pending', 'refunded')),
+    INDEX idx_payment_date (PaymentDate)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- 12) PROMOTION
--- TODO: CREATE TABLE PROMOTION.
--- Required attributes: PromotionID (PK), PromotionCode (UNIQUE), PromotionName,
--- Description, DiscountType, DiscountValue, MaximumDiscount, MinimumOrderValue,
--- StartDate, EndDate, UsageLimit, PromotionStatus.
--- Checks: DiscountValue > 0; percentage <= 100; MaximumDiscount >= 0 when set;
--- MinimumOrderValue >= 0; EndDate >= StartDate; UsageLimit > 0.
+CREATE TABLE PROMOTION (
+    PromotionID       INT           NOT NULL AUTO_INCREMENT,
+    PromotionCode     VARCHAR(50)   NOT NULL,
+    PromotionName     VARCHAR(100)  NOT NULL,
+    Description       VARCHAR(500)  NULL,
+    DiscountType      VARCHAR(20)   NOT NULL,
+    DiscountValue     DECIMAL(10,2) NOT NULL,
+    MaximumDiscount   DECIMAL(15,2) NULL,
+    MinimumOrderValue DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    StartDate         DATETIME      NOT NULL,
+    EndDate           DATETIME      NOT NULL,
+    UsageLimit        INT           NOT NULL,
+    PromotionStatus   VARCHAR(20)   NOT NULL DEFAULT 'active',
+    CONSTRAINT pk_promotion PRIMARY KEY (PromotionID),
+    CONSTRAINT uq_promotion_code UNIQUE (PromotionCode),
+    CONSTRAINT chk_promo_type
+        CHECK (DiscountType IN ('percentage', 'fixed')),
+    CONSTRAINT chk_promo_value
+        CHECK (DiscountValue > 0),
+    CONSTRAINT chk_promo_pct
+        CHECK (DiscountType <> 'percentage' OR DiscountValue <= 100),
+    CONSTRAINT chk_promo_max_discount
+        CHECK (MaximumDiscount IS NULL OR MaximumDiscount >= 0),
+    CONSTRAINT chk_promo_min_order
+        CHECK (MinimumOrderValue >= 0),
+    CONSTRAINT chk_promo_dates
+        CHECK (EndDate >= StartDate),
+    CONSTRAINT chk_promo_limit
+        CHECK (UsageLimit > 0),
+    CONSTRAINT chk_promo_status
+        CHECK (PromotionStatus IN ('active', 'inactive', 'expired')),
+    INDEX idx_promo_status_dates (PromotionStatus, StartDate, EndDate)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- 13) APPLIED_TO (associative table for DELIVERY_ORDER <-> PROMOTION)
--- TODO: CREATE TABLE APPLIED_TO.
--- Required attributes: OrderID (FK -> DELIVERY_ORDER), PromotionID (FK -> PROMOTION),
--- DiscountAmount, AppliedDate. Use composite PK (OrderID, PromotionID).
--- Constraint: DiscountAmount >= 0. More detailed discount validity, promotion
--- period and usage count require cross-table validation (see 2.2 trigger choice
--- or another suitable database mechanism).
+CREATE TABLE APPLIED_TO (
+    OrderID        INT           NOT NULL,
+    PromotionID    INT           NOT NULL,
+    DiscountAmount DECIMAL(15,2) NOT NULL,
+    AppliedDate    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_applied_to PRIMARY KEY (OrderID, PromotionID),
+    CONSTRAINT fk_applied_order FOREIGN KEY (OrderID)
+        REFERENCES DELIVERY_ORDER (OrderID) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_applied_promo FOREIGN KEY (PromotionID)
+        REFERENCES PROMOTION (PromotionID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_applied_discount
+        CHECK (DiscountAmount >= 0),
+    INDEX idx_applied_promo (PromotionID)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- 14) POINT_TRANSACTION
--- TODO: CREATE TABLE POINT_TRANSACTION.
--- Required attributes: PointTransactionID (PK), CustomerID (FK -> CUSTOMER),
--- OrderID (nullable UNIQUE FK -> DELIVERY_ORDER if matching A1), PointAmount,
--- TransactionType, TransactionDate, Description.
--- A1 requires the customer balance to equal earned points minus redeemed points;
--- a deduction must not make the balance negative.
+CREATE TABLE POINT_TRANSACTION (
+    PointTransactionID INT          NOT NULL AUTO_INCREMENT,
+    CustomerID         INT          NOT NULL,
+    OrderID            INT          NULL,
+    PointAmount        INT          NOT NULL,
+    TransactionType    VARCHAR(20)  NOT NULL,
+    TransactionDate    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Description        VARCHAR(500) NULL,
+    CONSTRAINT pk_point_transaction PRIMARY KEY (PointTransactionID),
+    CONSTRAINT uq_point_order UNIQUE (OrderID),
+    CONSTRAINT fk_point_customer FOREIGN KEY (CustomerID)
+        REFERENCES CUSTOMER (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_point_order FOREIGN KEY (OrderID)
+        REFERENCES DELIVERY_ORDER (OrderID) ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT chk_point_type
+        CHECK (TransactionType IN ('earn', 'redeem', 'adjustment')),
+    CONSTRAINT chk_point_amount
+        CHECK ((TransactionType = 'earn' AND PointAmount > 0)
+            OR (TransactionType = 'redeem' AND PointAmount < 0)
+            OR (TransactionType = 'adjustment')),
+    INDEX idx_point_customer_date (CustomerID, TransactionDate)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- 15) FEEDBACK
--- TODO: CREATE TABLE FEEDBACK.
--- Required attributes: FeedbackID (PK), OrderID (FK -> DELIVERY_ORDER),
--- CustomerID (FK -> CUSTOMER), ShipperID (FK -> SHIPPER), Rating, Comment,
--- CreatedDate, FeedbackType.
--- Constraints: Rating is an integer 1..5. Enforce at most one feedback per party
--- per order (use a suitable UNIQUE key or equivalent design based on FeedbackType).
--- Only completed orders can receive feedback (cross-table rule).
+CREATE TABLE FEEDBACK (
+    FeedbackID   INT           NOT NULL AUTO_INCREMENT,
+    OrderID      INT           NOT NULL,
+    CustomerID   INT           NOT NULL,
+    ShipperID    INT           NOT NULL,
+    Rating       TINYINT       NOT NULL,
+    Comment      VARCHAR(1000) NULL,
+    CreatedDate  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FeedbackType VARCHAR(20)   NOT NULL,
+    CONSTRAINT pk_feedback PRIMARY KEY (FeedbackID),
+    CONSTRAINT uq_feedback_party_order UNIQUE (OrderID, FeedbackType),
+    CONSTRAINT fk_feedback_order FOREIGN KEY (OrderID)
+        REFERENCES DELIVERY_ORDER (OrderID) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_feedback_customer FOREIGN KEY (CustomerID)
+        REFERENCES CUSTOMER (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_feedback_shipper FOREIGN KEY (ShipperID)
+        REFERENCES SHIPPER (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_feedback_rating
+        CHECK (Rating BETWEEN 1 AND 5),
+    CONSTRAINT chk_feedback_type
+        CHECK (FeedbackType IN ('customer', 'shipper')),
+    INDEX idx_feedback_shipper (ShipperID, FeedbackType, Rating)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- 16) SHIPPER_EARNING
--- TODO: CREATE TABLE SHIPPER_EARNING.
--- Required attributes: EarningID (PK), ShipperID (FK -> SHIPPER),
--- OrderID (UNIQUE FK -> DELIVERY_ORDER), DeliveryFee, PlatformCommission,
--- NetEarning (derived or stored), EarningDate, PayoutStatus, PayoutDate.
--- Constraints: PlatformCommission between 0 and DeliveryFee; NetEarning equals
--- DeliveryFee - PlatformCommission; paid payout requires PayoutDate >= EarningDate.
--- Historical earning values must not change when a commission policy changes.
+CREATE TABLE SHIPPER_EARNING (
+    EarningID          INT           NOT NULL AUTO_INCREMENT,
+    ShipperID          INT           NOT NULL,
+    OrderID            INT           NOT NULL,
+    DeliveryFee        DECIMAL(15,2) NOT NULL,
+    PlatformCommission DECIMAL(15,2) NOT NULL,
+    NetEarning         DECIMAL(15,2) GENERATED ALWAYS AS (DeliveryFee - PlatformCommission) STORED,
+    EarningDate        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PayoutStatus       VARCHAR(20)   NOT NULL DEFAULT 'pending',
+    PayoutDate         DATETIME      NULL,
+    CONSTRAINT pk_shipper_earning PRIMARY KEY (EarningID),
+    CONSTRAINT uq_earning_order UNIQUE (OrderID),
+    CONSTRAINT fk_earning_shipper FOREIGN KEY (ShipperID)
+        REFERENCES SHIPPER (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_earning_order FOREIGN KEY (OrderID)
+        REFERENCES DELIVERY_ORDER (OrderID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_earning_fee
+        CHECK (DeliveryFee >= 0),
+    CONSTRAINT chk_earning_commission
+        CHECK (PlatformCommission >= 0 AND PlatformCommission <= DeliveryFee),
+    CONSTRAINT chk_earning_payout_status
+        CHECK (PayoutStatus IN ('pending', 'processing', 'paid', 'cancelled')),
+    CONSTRAINT chk_earning_payout_date
+        CHECK ((PayoutStatus = 'paid' AND PayoutDate IS NOT NULL AND PayoutDate >= EarningDate)
+            OR (PayoutStatus <> 'paid' AND PayoutDate IS NULL)),
+    INDEX idx_earning_shipper_date (ShipperID, EarningDate)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- ---------------------------------------------------------------------------
 -- A1 semantic constraints to map to CHECK / FK / UNIQUE / TRIGGER / procedure:

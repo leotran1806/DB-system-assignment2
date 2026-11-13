@@ -27,47 +27,96 @@ DELIMITER ;
 -- ---------------------------------------------------------------------------
 
 -- 2.2.2 DERIVED ATTRIBUTE CHOSEN FROM A1: SHIPPER.AverageRating
--- Definition from A1: average rating from FEEDBACK submitted by Customers about
--- the shipper. Feedback submitted by the shipper about the customer is excluded.
+-- Implemented by: Lê Tuấn
+-- Definition from A1 (#14): average rating from FEEDBACK submitted by Customers
+-- about the shipper. Feedback submitted by the shipper about the customer is excluded.
 --
 -- DML operations that affect AverageRating:
---   * INSERT into FEEDBACK (a customer feedback is added).
---   * UPDATE FEEDBACK (Rating, ShipperID or FeedbackType changes).
---   * DELETE from FEEDBACK (a customer feedback is removed).
+--   * INSERT into FEEDBACK: when a new customer feedback is added.
+--   * UPDATE on FEEDBACK: when Rating, ShipperID, or FeedbackType changes.
+--   * DELETE from FEEDBACK: when a customer feedback is removed.
 --
--- TODO:
--- 1. Ensure SHIPPER has a stored AverageRating column (e.g. DECIMAL(3,2)).
--- 2. Create AFTER INSERT, AFTER UPDATE and AFTER DELETE triggers on FEEDBACK.
--- 3. Recalculate with AVG(Rating) where ShipperID = the affected shipper and
---    FeedbackType='customer'; use COALESCE(..., 0.00) when no ratings remain.
--- 4. For UPDATE, recalculate both OLD.ShipperID and NEW.ShipperID if the shipper
---    association changes. If FeedbackType changes, recalculate affected shipper.
--- 5. Do not include FeedbackType='shipper' in the average.
--- 6. Add a test that inserts, changes and deletes feedback and checks the stored
---    AverageRating after each operation.
---
--- Template (complete the TODOs and remove the comment markers before running):
--- DELIMITER $$
--- CREATE TRIGGER trg_feedback_ai
--- AFTER INSERT ON FEEDBACK
--- FOR EACH ROW
--- BEGIN
---     -- TODO: UPDATE SHIPPER SET AverageRating = (SELECT COALESCE(AVG(Rating),0)
---     --        FROM FEEDBACK WHERE ShipperID=NEW.ShipperID
---     --        AND FeedbackType='customer') WHERE UserID=NEW.ShipperID;
--- END$$
---
--- CREATE TRIGGER trg_feedback_au
--- AFTER UPDATE ON FEEDBACK
--- FOR EACH ROW
--- BEGIN
---     -- TODO: recalculate OLD.ShipperID and NEW.ShipperID when applicable.
--- END$$
---
--- CREATE TRIGGER trg_feedback_ad
--- AFTER DELETE ON FEEDBACK
--- FOR EACH ROW
--- BEGIN
---     -- TODO: recalculate OLD.ShipperID.
--- END$$
--- DELIMITER ;
+-- Formula:
+--   AverageRating = ROUND(AVG(Rating), 2) for FeedbackType = 'customer'.
+--   COALESCE to 0.00 if no customer feedback records exist.
+
+DELIMITER $$
+
+DROP TRIGGER IF EXISTS trg_feedback_after_insert$$
+CREATE TRIGGER trg_feedback_after_insert
+AFTER INSERT ON FEEDBACK
+FOR EACH ROW
+BEGIN
+    IF NEW.FeedbackType = 'customer' THEN
+        UPDATE SHIPPER
+        SET AverageRating = COALESCE((
+            SELECT ROUND(AVG(Rating), 2)
+            FROM FEEDBACK
+            WHERE ShipperID = NEW.ShipperID
+              AND FeedbackType = 'customer'
+        ), 0.00)
+        WHERE UserID = NEW.ShipperID;
+    END IF;
+END$$
+
+DROP TRIGGER IF EXISTS trg_feedback_after_update$$
+CREATE TRIGGER trg_feedback_after_update
+AFTER UPDATE ON FEEDBACK
+FOR EACH ROW
+BEGIN
+    -- Case 1: ShipperID reassigned to another shipper
+    IF OLD.ShipperID <> NEW.ShipperID THEN
+        IF OLD.FeedbackType = 'customer' THEN
+            UPDATE SHIPPER
+            SET AverageRating = COALESCE((
+                SELECT ROUND(AVG(Rating), 2)
+                FROM FEEDBACK
+                WHERE ShipperID = OLD.ShipperID
+                  AND FeedbackType = 'customer'
+            ), 0.00)
+            WHERE UserID = OLD.ShipperID;
+        END IF;
+
+        IF NEW.FeedbackType = 'customer' THEN
+            UPDATE SHIPPER
+            SET AverageRating = COALESCE((
+                SELECT ROUND(AVG(Rating), 2)
+                FROM FEEDBACK
+                WHERE ShipperID = NEW.ShipperID
+                  AND FeedbackType = 'customer'
+            ), 0.00)
+            WHERE UserID = NEW.ShipperID;
+        END IF;
+    ELSE
+        -- Case 2: Same ShipperID, but Rating or FeedbackType changed
+        IF (OLD.Rating <> NEW.Rating) OR (OLD.FeedbackType <> NEW.FeedbackType) THEN
+            UPDATE SHIPPER
+            SET AverageRating = COALESCE((
+                SELECT ROUND(AVG(Rating), 2)
+                FROM FEEDBACK
+                WHERE ShipperID = NEW.ShipperID
+                  AND FeedbackType = 'customer'
+            ), 0.00)
+            WHERE UserID = NEW.ShipperID;
+        END IF;
+    END IF;
+END$$
+
+DROP TRIGGER IF EXISTS trg_feedback_after_delete$$
+CREATE TRIGGER trg_feedback_after_delete
+AFTER DELETE ON FEEDBACK
+FOR EACH ROW
+BEGIN
+    IF OLD.FeedbackType = 'customer' THEN
+        UPDATE SHIPPER
+        SET AverageRating = COALESCE((
+            SELECT ROUND(AVG(Rating), 2)
+            FROM FEEDBACK
+            WHERE ShipperID = OLD.ShipperID
+              AND FeedbackType = 'customer'
+        ), 0.00)
+        WHERE UserID = OLD.ShipperID;
+    END IF;
+END$$
+
+DELIMITER ;
