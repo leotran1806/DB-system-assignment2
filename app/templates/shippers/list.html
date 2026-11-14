@@ -10,12 +10,12 @@
 </div>
 
 <div class="alert alert-info">
-  Đây là bộ khung giao diện. Các thao tác dữ liệu chưa được cài đặt; hoàn thiện TODO trong
-  <code>services/shipper_service.py</code> và các procedure trong <code>database/04_procedures.sql</code>.
-  Giao diện vẫn mở được khi chưa cấu hình MySQL.
+  Danh sách, tìm kiếm, lọc và sắp xếp gọi <code>sp_ListShippers</code>. Thêm / Sửa / Xóa gọi
+  <code>sp_InsertShipper</code>, <code>sp_UpdateShipper</code>, <code>sp_DeleteShipper</code>
+  qua <code>services/shipper_service.py</code>.
 </div>
 
-<section class="card">
+<section class="card" id="add-shipper">
   <h2>Thêm Shipper</h2>
   <p class="muted">Nhập UserID đã tồn tại trong USER. Khi hiện thực SQL, xác nhận ID chưa được dùng sai vai trò và thỏa các khóa ngoại.</p>
   <form method="post" action="{{ url_for('shippers.index') }}" class="grid">
@@ -99,8 +99,9 @@
   <div class="page-head">
     <div>
       <h2>Danh sách Shipper</h2>
-      <p class="muted">{{ rows|length }} bản ghi trả về · cần JOIN tối thiểu USER và SHIPPER, có thể JOIN VEHICLE.</p>
+      <p class="muted">{{ rows|length }} bản ghi · dữ liệu từ <code>sp_ListShippers</code> (JOIN SHIPPER, USER, VEHICLE).</p>
     </div>
+    <a class="btn btn-primary" href="#add-shipper">＋ Thêm mới</a>
   </div>
   <table>
     <thead>
@@ -142,7 +143,7 @@
       </tr>
     {% else %}
       <tr><td colspan="9" class="empty">
-        Chưa có dữ liệu để hiển thị. Hãy hoàn thiện <code>sp_ListShippers</code> và hàm service tương ứng.
+        Không có shipper nào khớp với bộ lọc hiện tại.
       </td></tr>
     {% endfor %}
     </tbody>
