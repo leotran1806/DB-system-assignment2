@@ -28,97 +28,171 @@ USE parcel_delivery;
 --   [ ] clear SIGNAL SQLSTATE '45000' message for every specific failure
 --   [ ] transaction + rollback if the routine changes dependent tables
 --
+-- ---------------------------------------------------------------------------
+-- sp_InsertShipper: create USER + SHIPPER + VEHICLE + SHIPPER_LICENSE in one transaction
+-- ---------------------------------------------------------------------------
+DELIMITER $$
 
--- ---------------------------- INSERT ----------------------------------------
--- I1  ERROR  user does not exist                                -> User does not exist.
-CALL sp_InsertShipper(999, '079098111333', 'offline', 4);
--- I2  ERROR  user ID is NULL                                    -> User ID must be provided.
-CALL sp_InsertShipper(NULL, '079098111333', 'offline', 4);
--- I3  ERROR  user 28 is suspended                               -> The user account is not active...
-CALL sp_InsertShipper(28, '079098111333', 'offline', 4);
--- I4  ERROR  user 27 is 16 years old                            -> The user must be at least 18 years old...
-CALL sp_InsertShipper(27, '079098111333', 'offline', 4);
--- I5  ERROR  user 16 is already a shipper                       -> This user is already a shipper.
-CALL sp_InsertShipper(16, '079098111333', 'offline', 4);
--- I6  ERROR  user 6 is a customer                               -> This user is a customer...
-CALL sp_InsertShipper(6, '079098111333', 'offline', 4);
--- I7  ERROR  user 1 is an admin                                 -> This user is an admin...
-CALL sp_InsertShipper(1, '079098111333', 'offline', 4);
--- I8  ERROR  national ID too short                              -> ...exactly 12 digits and start with 0.
-CALL sp_InsertShipper(26, '123', 'offline', 4);
--- I9  ERROR  national ID does not start with 0
-CALL sp_InsertShipper(26, '179098111333', 'offline', 4);
--- I10 ERROR  national ID has 13 digits
-CALL sp_InsertShipper(26, '0790981113334', 'offline', 4);
--- I11 ERROR  national ID already used by shipper 16             -> ...already belongs to another shipper.
-CALL sp_InsertShipper(26, '079095123401', 'offline', 4);
--- I12 ERROR  invalid availability                               -> Availability status must be available, busy or offline.
-CALL sp_InsertShipper(26, '079098111333', 'sleeping', 4);
--- I13 ERROR  admin missing (NULL)                               -> Managing admin must be provided.
-CALL sp_InsertShipper(26, '079098111333', 'offline', NULL);
--- I14 ERROR  admin does not exist                               -> Managing admin does not exist.
-CALL sp_InsertShipper(26, '079098111333', 'offline', 99);
--- I15 ERROR  admin 5 is suspended                               -> Managing admin account is not active.
-CALL sp_InsertShipper(26, '079098111333', 'offline', 5);
--- I16 OK     user 26 (adult, active, no role): run this one LAST, after all the error cases -> inserted
-CALL sp_InsertShipper(26, '079098111222', 'offline', 4);
--- Check I16:
-SELECT * FROM SHIPPER WHERE UserID = 26;
- 
--- ---------------------------- UPDATE ----------------------------------------
--- U1  OK     shipper 22: change availability to offline         -> updated
-CALL sp_UpdateShipper(22, '031200789007', 'offline', 4);
--- U2  OK     same values again                                  -> unchanged
-CALL sp_UpdateShipper(22, '031200789007', 'offline', 4);
--- U3  OK     change the managing admin to admin 1               -> updated
-CALL sp_UpdateShipper(22, '031200789007', 'available', 1);
--- U4  ERROR  shipper does not exist                             -> Shipper does not exist.
-CALL sp_UpdateShipper(999, '031200789007', 'offline', 4);
--- U5  ERROR  bad national ID                                    -> ...exactly 12 digits and start with 0.
-CALL sp_UpdateShipper(22, '12345', 'offline', 4);
--- U6  ERROR  national ID of shipper 16                          -> ...already belongs to another shipper.
-CALL sp_UpdateShipper(22, '079095123401', 'offline', 4);
--- U7  ERROR  invalid availability                               -> Availability status must be available, busy or offline.
-CALL sp_UpdateShipper(22, '031200789007', 'sleeping', 4);
--- U8  ERROR  shipper 24 is suspended and cannot be available    -> A suspended or closed shipper can only be offline.
-CALL sp_UpdateShipper(24, '087093901209', 'available', 2);
--- U9  ERROR  shipper 18 has an accepted assignment              -> Cannot set the shipper offline while...
-CALL sp_UpdateShipper(18, '048197345603', 'offline', 2);
--- U10 ERROR  admin missing (NULL)                               -> Managing admin must be provided.
-CALL sp_UpdateShipper(22, '031200789007', 'available', NULL);
--- U11 ERROR  admin does not exist                               -> Managing admin does not exist.
-CALL sp_UpdateShipper(22, '031200789007', 'available', 99);
--- U12 ERROR  admin 5 is suspended                               -> Managing admin account is not active.
-CALL sp_UpdateShipper(22, '031200789007', 'available', 5);
--- Put shipper 22 back to its sample values:
-CALL sp_UpdateShipper(22, '031200789007', 'available', 4);
- 
--- ---------------------------- DELETE ----------------------------------------
--- D1  ERROR  shipper 18 has an assignment                       -> Cannot delete: ...delivery assignments...
-CALL sp_DeleteShipper(18);
--- D2  ERROR  shipper 17 has an earning                          -> Cannot delete: ...earning records...
-CALL sp_DeleteShipper(17);
--- D3  ERROR  shipper 19 has feedback                            -> Cannot delete: ...feedback records...
-CALL sp_DeleteShipper(19);
--- D4  ERROR  shipper 20 is in the status history                -> Cannot delete: ...order status history...
-CALL sp_DeleteShipper(20);
--- D5  ERROR  shipper does not exist                             -> Shipper does not exist.
-CALL sp_DeleteShipper(999);
--- D6  ERROR  NULL                                               -> Shipper does not exist.
-CALL sp_DeleteShipper(NULL);
--- D7  ERROR  user 6 is a customer, not a shipper                -> Shipper does not exist.
-CALL sp_DeleteShipper(6);
--- Run D8 and D9 last: they remove data. Reload the sample data to repeat the test.
--- D8  OK     shipper 26 (inserted in I1, no history)            -> deleted
-CALL sp_DeleteShipper(26);
--- D9  OK     shipper 22 has a vehicle and a licence, no history -> deleted (SHIPPER_LICENSE, VEHICLE, SHIPPER)
-CALL sp_DeleteShipper(22);
--- D10 OK     shipper 25 has no vehicle                          -> deleted
-CALL sp_DeleteShipper(25);
-SELECT 'user 22 still exists' AS Check1, COUNT(*) AS Total FROM `USER` WHERE UserID = 22;
-SELECT 'vehicle of shipper 22 removed' AS Check2, COUNT(*) AS Total FROM VEHICLE WHERE ShipperID = 22;
- 
---
+DROP PROCEDURE IF EXISTS sp_InsertShipper$$
+CREATE PROCEDURE sp_InsertShipper(
+    IN p_Email VARCHAR(100),
+    IN p_PhoneNumber VARCHAR(10),
+    IN p_Password VARCHAR(255),
+    IN p_DateOfBirth DATE,
+    IN p_Gender VARCHAR(10),
+    IN p_FirstName VARCHAR(50),
+    IN p_LastName VARCHAR(50),
+    IN p_NationalIdentificationNumber VARCHAR(12),
+    IN p_ManagedByAdminID INT,
+    IN p_LicenseNumber VARCHAR(12),
+    IN p_LicenseType VARCHAR(5),
+    IN p_LicenseIssueDate DATE,
+    IN p_LicenseExpiryDate DATE,
+    IN p_Brand VARCHAR(50),
+    IN p_Model VARCHAR(50),
+    IN p_LicensePlate VARCHAR(15),
+    IN p_Color VARCHAR(30),
+    IN p_MaximumLoad DECIMAL(8,2),
+    IN p_VehicleType VARCHAR(20)
+)
+BEGIN
+    DECLARE v_NewUserID INT;
+
+    -- Roll back everything if any unexpected SQL error happens
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    -- ===== Validation: user information =====
+    IF p_FirstName IS NULL OR TRIM(p_FirstName) = '' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'First name must not be empty.';
+    END IF;
+    IF p_LastName IS NULL OR TRIM(p_LastName) = '' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Last name must not be empty.';
+    END IF;
+    IF p_DateOfBirth IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Date of birth must be provided.';
+    END IF;
+    IF TIMESTAMPDIFF(YEAR, p_DateOfBirth, CURDATE()) < 18 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The shipper must be at least 18 years old.';
+    END IF;
+    IF p_Gender IS NULL OR p_Gender NOT IN ('male', 'female') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Gender must be male or female.';
+    END IF;
+    IF p_Email IS NULL OR p_Email NOT REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Email format is invalid.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `USER` WHERE Email = p_Email) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This email is already used by another account.';
+    END IF;
+    IF p_PhoneNumber IS NULL OR p_PhoneNumber NOT REGEXP '^0[0-9]{9}$' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phone number must be exactly 10 digits and start with 0.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM `USER` WHERE PhoneNumber = p_PhoneNumber) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This phone number is already used by another account.';
+    END IF;
+    IF p_Password IS NULL OR CHAR_LENGTH(p_Password) < 8 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Password must have at least 8 characters.';
+    END IF;
+
+    -- ===== Validation: shipper information =====
+    IF p_NationalIdentificationNumber IS NULL
+       OR p_NationalIdentificationNumber NOT REGEXP '^0[0-9]{11}$' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'National ID must be exactly 12 digits and start with 0.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM SHIPPER WHERE NationalIdentificationNumber = p_NationalIdentificationNumber) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This national ID already belongs to another shipper.';
+    END IF;
+    IF p_ManagedByAdminID IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Managing admin must be provided.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM ADMIN WHERE UserID = p_ManagedByAdminID) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Managing admin does not exist.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM `USER` WHERE UserID = p_ManagedByAdminID AND AccountStatus = 'active') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Managing admin account is not active.';
+    END IF;
+
+    -- ===== Validation: driving licence =====
+    IF p_LicenseNumber IS NULL OR p_LicenseNumber NOT REGEXP '^[0-9]{9,12}$' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Licence number must be 9 to 12 digits.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM SHIPPER_LICENSE WHERE LicenseNumber = p_LicenseNumber) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This licence number is already registered.';
+    END IF;
+    IF p_LicenseType IS NULL OR p_LicenseType NOT IN ('A1', 'A2', 'B1', 'B2', 'C') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Licence type must be A1, A2, B1, B2 or C.';
+    END IF;
+    IF p_LicenseIssueDate IS NULL OR p_LicenseExpiryDate IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Licence issue date and expiry date must be provided.';
+    END IF;
+    IF p_LicenseExpiryDate <= p_LicenseIssueDate THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Licence expiry date must be after the issue date.';
+    END IF;
+    IF p_LicenseExpiryDate < CURDATE() THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The driving licence has expired.';
+    END IF;
+
+    -- ===== Validation: vehicle =====
+    IF p_VehicleType IS NULL OR p_VehicleType NOT IN ('motorbike', 'car', 'van', 'truck') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Vehicle type must be motorbike, car, van or truck.';
+    END IF;
+    IF p_LicensePlate IS NULL
+       OR p_LicensePlate NOT REGEXP '^[0-9]{2}-?[A-Z][A-Z0-9]?[ -]?[0-9]{3}\\.?[0-9]{2}$' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Licence plate format is invalid.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM VEHICLE WHERE LicensePlate = p_LicensePlate) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This licence plate is already registered.';
+    END IF;
+    IF p_MaximumLoad IS NULL OR p_MaximumLoad <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Maximum load must be greater than 0.';
+    END IF;
+    IF p_Brand IS NULL OR TRIM(p_Brand) = '' OR p_Model IS NULL OR TRIM(p_Model) = ''
+       OR p_Color IS NULL OR TRIM(p_Color) = '' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Vehicle brand, model and color must not be empty.';
+    END IF;
+
+    -- ===== Validation: licence type must allow this vehicle =====
+    IF p_VehicleType = 'motorbike' AND p_LicenseType NOT IN ('A1', 'A2') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A motorbike requires an A1 or A2 licence.';
+    END IF;
+    IF p_VehicleType IN ('car', 'van') AND p_LicenseType NOT IN ('B1', 'B2', 'C') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A car or van requires a B1, B2 or C licence.';
+    END IF;
+    IF p_VehicleType = 'truck' AND p_LicenseType NOT IN ('B2', 'C') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A truck requires a B2 or C licence.';
+    END IF;
+
+    -- ===== All checks passed: insert into 4 tables =====
+    START TRANSACTION;
+
+    INSERT INTO `USER` (Email, PhoneNumber, PasswordHash, AccountStatus, CreatedDate,
+                        DateOfBirth, Gender, FirstName, LastName)
+    VALUES (p_Email, p_PhoneNumber, SHA2(p_Password, 256), 'active', CURDATE(),
+            p_DateOfBirth, p_Gender, TRIM(p_FirstName), TRIM(p_LastName));
+
+    SET v_NewUserID = LAST_INSERT_ID();
+
+    INSERT INTO SHIPPER (UserID, NationalIdentificationNumber, AvailabilityStatus,
+                         JoinDate, ManagedByAdminID)
+    VALUES (v_NewUserID, p_NationalIdentificationNumber, 'offline', CURDATE(), p_ManagedByAdminID);
+
+    INSERT INTO SHIPPER_LICENSE (ShipperID, LicenseNumber, LicenseType, IssueDate, ExpiryDate)
+    VALUES (v_NewUserID, p_LicenseNumber, p_LicenseType, p_LicenseIssueDate, p_LicenseExpiryDate);
+
+    INSERT INTO VEHICLE (ShipperID, Brand, Model, LicensePlate, Color, MaximumLoad, VehicleType)
+    VALUES (v_NewUserID, TRIM(p_Brand), TRIM(p_Model), p_LicensePlate, TRIM(p_Color),
+            p_MaximumLoad, p_VehicleType);
+
+    COMMIT;
+
+    SELECT v_NewUserID AS NewShipperID, 'Shipper created successfully.' AS Message;
+END$$
+
+DELIMITER ;
+
 -- Template signatures (uncomment and complete one at a time):
 -- DELIMITER $$
 -- CREATE PROCEDURE sp_InsertShipper(

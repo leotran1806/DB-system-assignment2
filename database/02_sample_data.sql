@@ -18,91 +18,109 @@ USE parcel_delivery;
 -- CHECK constraints, triggers, procedures and functions can be demonstrated.
 
 -- ============================================================================
--- TODO 1: USER (28 rows). Roles are disjoint: each UserID 1-25 belongs to exactly one subclass.
---         26-28 have no role yet; they are the candidates used to demonstrate sp_InsertShipper.
+-- USER (28 rows). ID scheme: customer 91001-91010, admin 91101-91105,
+-- shipper 91201-91210, role-less candidates 91301-91303.
 INSERT INTO `USER` (UserID, Email, PhoneNumber, PasswordHash, AccountStatus, CreatedDate, DateOfBirth, Gender, FirstName, LastName) VALUES
-(1, 'an.nguyen@parceldelivery.vn', '0901000001', SHA2('Password@123', 256), 'active', '2024-01-10', '1980-05-12', 'male', 'An', 'Nguyễn Văn'),
-(2, 'binh.tran@parceldelivery.vn', '0901000002', SHA2('Password@123', 256), 'active', '2024-02-15', '1985-09-03', 'female', 'Bình', 'Trần Thị'),
-(3, 'cuong.le@parceldelivery.vn', '0901000003', SHA2('Password@123', 256), 'active', '2024-03-01', '1983-11-21', 'male', 'Cường', 'Lê Quốc'),
-(4, 'dung.pham@parceldelivery.vn', '0901000004', SHA2('Password@123', 256), 'active', '2024-06-20', '1990-02-14', 'female', 'Dung', 'Phạm Thùy'),
-(5, 'khang.hoang@parceldelivery.vn', '0901000005', SHA2('Password@123', 256), 'suspended', '2024-08-05', '1992-07-30', 'male', 'Khang', 'Hoàng Gia'),
-(6, 'lan.nguyen@mail.com', '0912000006', SHA2('Password@123', 256), 'active', '2025-01-05', '1995-03-18', 'female', 'Lan', 'Nguyễn Thị'),
-(7, 'hung.vo@mail.com', '0912000007', SHA2('Password@123', 256), 'active', '2025-01-12', '1990-08-25', 'male', 'Hùng', 'Võ Mạnh'),
-(8, 'mai.dang@mail.com', '0912000008', SHA2('Password@123', 256), 'active', '2025-02-03', '1998-12-02', 'female', 'Mai', 'Đặng Thị'),
-(9, 'tuan.bui@mail.com', '0912000009', SHA2('Password@123', 256), 'active', '2025-02-20', '1988-06-09', 'male', 'Tuấn', 'Bùi Anh'),
-(10, 'hoa.ngo@mail.com', '0912000010', SHA2('Password@123', 256), 'active', '2025-03-14', '2001-01-27', 'female', 'Hoa', 'Ngô Thị'),
-(11, 'nam.do@mail.com', '0912000011', SHA2('Password@123', 256), 'active', '2025-04-02', '1993-10-11', 'male', 'Nam', 'Đỗ Hoàng'),
-(12, 'thao.vu@mail.com', '0912000012', SHA2('Password@123', 256), 'active', '2025-05-19', '1997-04-30', 'female', 'Thảo', 'Vũ Phương'),
-(13, 'long.dinh@mail.com', '0912000013', SHA2('Password@123', 256), 'active', '2025-06-08', '2003-09-15', 'male', 'Long', 'Đinh Thanh'),
-(14, 'yen.truong@mail.com', '0912000014', SHA2('Password@123', 256), 'suspended', '2025-07-21', '1994-02-08', 'female', 'Yến', 'Trương Hải'),
-(15, 'quang.ly@mail.com', '0912000015', SHA2('Password@123', 256), 'closed', '2025-08-30', '1989-12-19', 'male', 'Quang', 'Lý Minh'),
-(16, 'phuc.nguyen@mail.com', '0971000016', SHA2('Password@123', 256), 'active', '2025-01-08', '1995-04-10', 'male', 'Phúc', 'Nguyễn Hoàng'),
-(17, 'tai.tran@mail.com', '0971000017', SHA2('Password@123', 256), 'active', '2025-01-20', '1992-09-23', 'male', 'Tài', 'Trần Đức'),
-(18, 'ngoc.le@mail.com', '0971000018', SHA2('Password@123', 256), 'active', '2025-02-10', '1997-06-05', 'female', 'Ngọc', 'Lê Bảo'),
-(19, 'son.pham@mail.com', '0971000019', SHA2('Password@123', 256), 'active', '2025-03-03', '1994-01-17', 'male', 'Sơn', 'Phạm Trường'),
-(20, 'trang.vu@mail.com', '0971000020', SHA2('Password@123', 256), 'active', '2025-03-25', '1999-11-28', 'female', 'Trang', 'Vũ Thu'),
-(21, 'khoa.dang@mail.com', '0971000021', SHA2('Password@123', 256), 'active', '2025-04-12', '1991-07-14', 'male', 'Khoa', 'Đặng Anh'),
-(22, 'huy.bui@mail.com', '0971000022', SHA2('Password@123', 256), 'active', '2025-05-05', '2000-03-02', 'male', 'Huy', 'Bùi Quang'),
-(23, 'linh.ho@mail.com', '0971000023', SHA2('Password@123', 256), 'active', '2025-06-01', '1996-08-19', 'female', 'Linh', 'Hồ Thùy'),
-(24, 'dat.truong@mail.com', '0971000024', SHA2('Password@123', 256), 'suspended', '2025-06-18', '1993-05-26', 'male', 'Đạt', 'Trương Tiến'),
-(25, 'hieu.ly@mail.com', '0971000025', SHA2('Password@123', 256), 'closed', '2025-07-02', '1990-10-08', 'male', 'Hiếu', 'Lý Trung'),
-(26, 'khoa.nguyen@mail.com', '0981000026', SHA2('Password@123', 256), 'active', '2026-10-01', '1998-06-15', 'male', 'Khoa', 'Nguyễn Đăng'),
-(27, 'bao.tran@mail.com', '0981000027', SHA2('Password@123', 256), 'active', '2026-10-15', '2010-03-15', 'male', 'Bảo', 'Trần Gia'),
-(28, 'vy.le@mail.com', '0981000028', SHA2('Password@123', 256), 'suspended', '2026-09-20', '1996-12-01', 'female', 'Vy', 'Lê Khánh');
+-- Customers
+(91001, 'lan.nguyen@mail.com', '0912000006', SHA2('Password@123', 256), 'active', '2025-01-05', '1995-03-18', 'female', 'Lan', 'Nguyễn Thị'),
+(91002, 'hung.vo@mail.com', '0912000007', SHA2('Password@123', 256), 'active', '2025-01-12', '1990-08-25', 'male', 'Hùng', 'Võ Mạnh'),
+(91003, 'mai.dang@mail.com', '0912000008', SHA2('Password@123', 256), 'active', '2025-02-03', '1998-12-02', 'female', 'Mai', 'Đặng Thị'),
+(91004, 'tuan.bui@mail.com', '0912000009', SHA2('Password@123', 256), 'active', '2025-02-20', '1988-06-09', 'male', 'Tuấn', 'Bùi Anh'),
+(91005, 'hoa.ngo@mail.com', '0912000010', SHA2('Password@123', 256), 'active', '2025-03-14', '2001-01-27', 'female', 'Hoa', 'Ngô Thị'),
+(91006, 'nam.do@mail.com', '0912000011', SHA2('Password@123', 256), 'active', '2025-04-02', '1993-10-11', 'male', 'Nam', 'Đỗ Hoàng'),
+(91007, 'thao.vu@mail.com', '0912000012', SHA2('Password@123', 256), 'active', '2025-05-19', '1997-04-30', 'female', 'Thảo', 'Vũ Phương'),
+(91008, 'long.dinh@mail.com', '0912000013', SHA2('Password@123', 256), 'active', '2025-06-08', '2003-09-15', 'male', 'Long', 'Đinh Thanh'),
+(91009, 'yen.truong@mail.com', '0912000014', SHA2('Password@123', 256), 'suspended', '2025-07-21', '1994-02-08', 'female', 'Yến', 'Trương Hải'),
+(91010, 'quang.ly@mail.com', '0912000015', SHA2('Password@123', 256), 'closed', '2025-08-30', '1989-12-19', 'male', 'Quang', 'Lý Minh'),
+-- Admins
+(91101, 'an.nguyen@parceldelivery.vn', '0901000001', SHA2('Password@123', 256), 'active', '2024-01-10', '1980-05-12', 'male', 'An', 'Nguyễn Văn'),
+(91102, 'binh.tran@parceldelivery.vn', '0901000002', SHA2('Password@123', 256), 'active', '2024-02-15', '1985-09-03', 'female', 'Bình', 'Trần Thị'),
+(91103, 'cuong.le@parceldelivery.vn', '0901000003', SHA2('Password@123', 256), 'active', '2024-03-01', '1983-11-21', 'male', 'Cường', 'Lê Quốc'),
+(91104, 'dung.pham@parceldelivery.vn', '0901000004', SHA2('Password@123', 256), 'active', '2024-06-20', '1990-02-14', 'female', 'Dung', 'Phạm Thùy'),
+(91105, 'khang.hoang@parceldelivery.vn', '0901000005', SHA2('Password@123', 256), 'suspended', '2024-08-05', '1992-07-30', 'male', 'Khang', 'Hoàng Gia'),
+-- Shippers
+(91201, 'phuc.nguyen@mail.com', '0971000016', SHA2('Password@123', 256), 'active', '2025-01-08', '1995-04-10', 'male', 'Phúc', 'Nguyễn Hoàng'),
+(91202, 'tai.tran@mail.com', '0971000017', SHA2('Password@123', 256), 'active', '2025-01-20', '1992-09-23', 'male', 'Tài', 'Trần Đức'),
+(91203, 'ngoc.le@mail.com', '0971000018', SHA2('Password@123', 256), 'active', '2025-02-10', '1997-06-05', 'female', 'Ngọc', 'Lê Bảo'),
+(91204, 'son.pham@mail.com', '0971000019', SHA2('Password@123', 256), 'active', '2025-03-03', '1994-01-17', 'male', 'Sơn', 'Phạm Trường'),
+(91205, 'trang.vu@mail.com', '0971000020', SHA2('Password@123', 256), 'active', '2025-03-25', '1999-11-28', 'female', 'Trang', 'Vũ Thu'),
+(91206, 'khoa.dang@mail.com', '0971000021', SHA2('Password@123', 256), 'active', '2025-04-12', '1991-07-14', 'male', 'Khoa', 'Đặng Anh'),
+(91207, 'huy.bui@mail.com', '0971000022', SHA2('Password@123', 256), 'active', '2025-05-05', '2000-03-02', 'male', 'Huy', 'Bùi Quang'),
+(91208, 'linh.ho@mail.com', '0971000023', SHA2('Password@123', 256), 'active', '2025-06-01', '1996-08-19', 'female', 'Linh', 'Hồ Thùy'),
+(91209, 'dat.truong@mail.com', '0971000024', SHA2('Password@123', 256), 'suspended', '2025-06-18', '1993-05-26', 'male', 'Đạt', 'Trương Tiến'),
+(91210, 'hieu.ly@mail.com', '0971000025', SHA2('Password@123', 256), 'closed', '2025-07-02', '1990-10-08', 'male', 'Hiếu', 'Lý Trung'),
+-- Role-less candidates (for sp_InsertShipper demo)
+(91301, 'khoa.nguyen@mail.com', '0981000026', SHA2('Password@123', 256), 'active', '2026-10-01', '1998-06-15', 'male', 'Khoa', 'Nguyễn Đăng'),
+(91302, 'bao.tran@mail.com', '0981000027', SHA2('Password@123', 256), 'active', '2026-10-15', '2010-03-15', 'male', 'Bảo', 'Trần Gia'),
+(91303, 'vy.le@mail.com', '0981000028', SHA2('Password@123', 256), 'suspended', '2026-09-20', '1996-12-01', 'female', 'Vy', 'Lê Khánh');
 
--- TODO 2: ADMIN (5 rows). Supervisors are inserted before their subordinates; admin 5 is suspended.
+-- ADMIN (5 rows). Supervisors inserted before subordinates; admin 91105 is suspended.
 INSERT INTO ADMIN (UserID, EmployeeCode, Department, AccessLevel, HireDate, Supervisor_ID) VALUES
-(1, 'AD001', 'Operations', 3, '2024-01-10', NULL),
-(2, 'AD002', 'Customer Support', 2, '2024-02-15', 1),
-(3, 'AD003', 'Finance', 2, '2024-03-01', 1),
-(4, 'AD004', 'Technical', 1, '2024-06-20', 2),
-(5, 'AD005', 'Human Resources', 1, '2024-08-05', 3);
+(91101, 'AD001', 'Operations', 3, '2024-01-10', NULL),
+(91102, 'AD002', 'Customer Support', 2, '2024-02-15', 91101),
+(91103, 'AD003', 'Finance', 2, '2024-03-01', 91101),
+(91104, 'AD004', 'Technical', 1, '2024-06-20', 91102),
+(91105, 'AD005', 'Human Resources', 1, '2024-08-05', 91103);
 
--- TODO 3: CUSTOMER (10 rows). Customer 14 is suspended and 15 is closed (they must not create new orders).
--- NOTE: LoyaltyPoint must equal earned minus redeemed points in POINT_TRANSACTION (constraint 15).
+-- CUSTOMER (10 rows). 91009 is suspended, 91010 is closed.
+-- NOTE: LoyaltyPoint must equal earned minus redeemed points in POINT_TRANSACTION.
 INSERT INTO CUSTOMER (UserID, LoyaltyPoint) VALUES
-(6, 1200),
-(7, 350),
-(8, 0),
-(9, 2500),
-(10, 90),
-(11, 640),
-(12, 150),
-(13, 30),
-(14, 500),
-(15, 0);
+(91001, 1200),
+(91002, 350),
+(91003, 0),
+(91004, 2500),
+(91005, 90),
+(91006, 640),
+(91007, 150),
+(91008, 30),
+(91009, 500),
+(91010, 0);
 
--- TODO 4: SHIPPER (10 rows). AverageRating is left at its default 0.00; the trigger of 2.2.2 computes it from FEEDBACK.
--- Shipper 24 is suspended and 25 is closed, so both are offline. Admin 5 (suspended) manages nobody.
+-- SHIPPER (10 rows). 91209 is suspended and 91210 is closed, so both are offline.
 INSERT INTO SHIPPER (UserID, NationalIdentificationNumber, AvailabilityStatus, JoinDate, ManagedByAdminID) VALUES
-(16, '079095123401', 'available', '2025-01-15', 1),
-(17, '001092234502', 'available', '2025-02-01', 1),
-(18, '048197345603', 'busy', '2025-02-20', 2),
-(19, '092094456704', 'available', '2025-03-10', 2),
-(20, '075199567805', 'offline', '2025-04-01', 3),
-(21, '074091678906', 'busy', '2025-04-20', 3),
-(22, '031200789007', 'available', '2025-05-12', 4),
-(23, '056196890108', 'offline', '2025-06-10', 4),
-(24, '087093901209', 'offline', '2025-06-25', 2),
-(25, '038090012310', 'offline', '2025-07-09', 3);
+(91201, '079095123401', 'available', '2025-01-15', 91101),
+(91202, '001092234502', 'available', '2025-02-01', 91101),
+(91203, '048197345603', 'busy',      '2025-02-20', 91102),
+(91204, '092094456704', 'available', '2025-03-10', 91102),
+(91205, '075199567805', 'offline',   '2025-04-01', 91103),
+(91206, '074091678906', 'busy',      '2025-04-20', 91103),
+(91207, '031200789007', 'available', '2025-05-12', 91104),
+(91208, '056196890108', 'offline',   '2025-06-10', 91104),
+(91209, '087093901209', 'offline',   '2025-06-25', 91102),
+(91210, '038090012310', 'offline',   '2025-07-09', 91103);
 
--- TODO 6: VEHICLE (9 rows). One vehicle per shipper; shipper 25 has no vehicle.
+-- SHIPPER_LICENSE (11 rows). Shipper 91206 holds 2 licences; licence of 91204 is expired.
+INSERT INTO SHIPPER_LICENSE (ShipperID, LicenseNumber, LicenseType, IssueDate, ExpiryDate) VALUES
+(91201, '790116000001', 'A1', '2021-05-10', '2031-05-10'),
+(91202, '790117000002', 'A2', '2020-08-15', '2030-08-15'),
+(91203, '790118000003', 'A1', '2019-02-20', '2029-02-20'),
+(91204, '790119000004', 'A1', '2018-06-01', '2026-06-01'),
+(91205, '790120000005', 'A2', '2022-01-12', '2032-01-12'),
+(91206, '790121000006', 'B1', '2020-09-09', '2030-09-09'),
+(91206, '790121000016', 'A1', '2019-04-04', '2029-04-04'),
+(91207, '790122000007', 'B2', '2021-11-30', '2031-11-30'),
+(91208, '790123000008', 'B2', '2020-03-18', '2030-03-18'),
+(91209, '790124000009', 'C',  '2019-07-22', '2029-07-22'),
+(91210, '790125000010', 'A1', '2018-10-05', '2028-10-05');
+
+-- VEHICLE (9 rows). One vehicle per shipper; shipper 91210 has no vehicle.
 INSERT INTO VEHICLE (VehicleID, ShipperID, Brand, Model, LicensePlate, Color, MaximumLoad, VehicleType) VALUES
-(1, 16, 'Honda', 'Wave Alpha', '59X1-234.56', 'Red', 40, 'motorbike'),
-(2, 17, 'Yamaha', 'Exciter', '29B1-345.67', 'Black', 50, 'motorbike'),
-(3, 18, 'Honda', 'Air Blade', '43E1-456.78', 'White', 45, 'motorbike'),
-(4, 19, 'Honda', 'Vision', '65G1-567.89', 'Blue', 40, 'motorbike'),
-(5, 20, 'Yamaha', 'Sirius', '60B1-678.90', 'Silver', 40, 'motorbike'),
-(6, 21, 'Toyota', 'Vios', '51A-123.45', 'White', 400, 'car'),
-(7, 22, 'Kia', 'Morning', '30E-456.78', 'Silver', 350, 'car'),
-(8, 23, 'Hyundai', 'Solati', '51C-789.01', 'White', 900, 'van'),
-(9, 24, 'Isuzu', 'QKR', '29C-890.12', 'Blue', 1900, 'truck');
+(1, 91201, 'Honda', 'Wave Alpha', '59X1-234.56', 'Red', 40, 'motorbike'),
+(2, 91202, 'Yamaha', 'Exciter', '29B1-345.67', 'Black', 50, 'motorbike'),
+(3, 91203, 'Honda', 'Air Blade', '43E1-456.78', 'White', 45, 'motorbike'),
+(4, 91204, 'Honda', 'Vision', '65G1-567.89', 'Blue', 40, 'motorbike'),
+(5, 91205, 'Yamaha', 'Sirius', '60B1-678.90', 'Silver', 40, 'motorbike'),
+(6, 91206, 'Toyota', 'Vios', '51A-123.45', 'White', 400, 'car'),
+(7, 91207, 'Kia', 'Morning', '30E-456.78', 'Silver', 350, 'car'),
+(8, 91208, 'Hyundai', 'Solati', '51C-789.01', 'White', 900, 'van'),
+(9, 91209, 'Isuzu', 'QKR', '29C-890.12', 'Blue', 1900, 'truck');
 
 -- Row-count check for this group (each must be >= 5):
 SELECT 'USER' AS TableName, COUNT(*) AS Total FROM `USER`
 UNION ALL SELECT 'ADMIN', COUNT(*) FROM ADMIN
 UNION ALL SELECT 'CUSTOMER', COUNT(*) FROM CUSTOMER
 UNION ALL SELECT 'SHIPPER', COUNT(*) FROM SHIPPER
+UNION ALL SELECT 'SHIPPER_LICENSE', COUNT(*) FROM SHIPPER_LICENSE
 UNION ALL SELECT 'VEHICLE', COUNT(*) FROM VEHICLE;
 
 -- ============================================================================
