@@ -230,3 +230,101 @@ DELIMETER ;
 --      ORDER BY ...;
 -- END$$
 -- DELIMITER ;
+
+DROP PROCEDURE IF EXISTS sp_ListShippers;
+
+DELIMITER $$
+CREATE PROCEDURE sp_ListShippers(
+    IN p_Search             VARCHAR(100),  -- NULL/'' = không lọc
+    IN p_AvailabilityStatus VARCHAR(20),   -- available | busy | offline
+    IN p_AccountStatus      VARCHAR(20),   -- active | suspended | closed
+    IN p_VehicleType        VARCHAR(20),   -- motorbike | car | van | truck
+    IN p_SortBy             VARCHAR(20),   -- name | join_date | availability | rating (NULL = name)
+    IN p_UserID             INT            -- NULL = tất cả; có giá trị = 1 shipper
+)
+READS SQL DATA
+BEGIN
+    DECLARE v_pattern VARCHAR(310) DEFAULT NULL;
+
+    -- 1) Chuẩn hóa: chuỗi rỗng -> NULL
+    SET p_Search             = NULLIF(TRIM(p_Search), '');
+    SET p_AvailabilityStatus = NULLIF(TRIM(p_AvailabilityStatus), '');
+    SET p_AccountStatus      = NULLIF(TRIM(p_AccountStatus), '');
+    SET p_VehicleType        = NULLIF(TRIM(p_VehicleType), '');
+    SET p_SortBy             = COALESCE(NULLIF(TRIM(p_SortBy), ''), 'name');
+
+    -- 2) Validate (thông báo cụ thể cho từng điều kiện)
+    IF p_AvailabilityStatus IS NOT NULL
+       AND p_AvailabilityStatus NOT IN ('available', 'busy', 'offline') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'AvailabilityStatus must be available, busy or offline.';
+    END IF;
+
+    IF p_AccountStatus IS NOT NULL
+       AND p_AccountStatus NOT IN ('active', 'suspended', 'closed') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'AccountStatus must be active, suspended or closed.';
+    END IF;
+
+    IF p_VehicleType IS NOT NULL
+       AND p_VehicleType NOT IN ('motorbike', 'car', 'van', 'truck') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'VehicleType must be motorbike, car, van or truck.';
+    END IF;
+
+    IF p_SortBy NOT IN ('name', 'join_date', 'availability', 'rating') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'SortBy must be name, join_date, availability or rating.';
+    END IF;
+
+    IF p_UserID IS NOT NULL AND p_UserID <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'UserID must be a positive integer.';
+    END IF;
+
+    -- 3) Escape ký tự đặc biệt của LIKE bằng '|' để tìm đúng chuỗi người dùng gõ
+    --    (VD: '%' hoặc '_' không bị hiểu là wildcard).
+    IF p_Search IS NOT NULL THEN
+        SET v_pattern = CONCAT(
+            '%',
+            REPLACE(REPLACE(REPLACE(p_Search, '|', '||'), '%', '|%'), '_', '|_'),
+            '%'
+        );
+    END IF;
+
+    -- 4) Truy vấn chính
+    SELECT
+        s.UserID                                  AS UserID,
+        CONCAT_WS(' ', u.LastName, u.FirstName)   AS FullName,
+        u.Email                                   AS Email,
+        u.PhoneNumber                             AS PhoneNumber,
+        s.NationalIdentificationNumber            AS NationalIdentificationNumber,
+        s.AvailabilityStatus                      AS AvailabilityStatus,
+        u.AccountStatus                           AS AccountStatus,
+        v.VehicleType                             AS VehicleType,
+        v.LicensePlate                            AS LicensePlate,
+        s.JoinDate                                AS JoinDate,
+        s.AverageRating                           AS AverageRating,
+        s.ManagedByAdminID                        AS ManagedByAdminID
+    FROM SHIPPER s
+    JOIN `USER` u      ON u.UserID    = s.UserID
+    LEFT JOIN VEHICLE v ON v.ShipperID = s.UserID
+    WHERE (p_UserID             IS NULL OR s.UserID            = p_UserID)
+      AND (p_AvailabilityStatus IS NULL OR s.AvailabilityStatus = p_AvailabilityStatus)
+      AND (p_AccountStatus      IS NULL OR u.AccountStatus      = p_AccountStatus)
+      AND (p_VehicleType        IS NULL OR v.VehicleType        = p_VehicleType)
+      AND (v_pattern IS NULL
+           OR CONCAT_WS(' ', u.LastName, u.FirstName) LIKE v_pattern ESCAPE '|'
+           OR u.Email                                 LIKE v_pattern ESCAPE '|'
+           OR u.PhoneNumber                           LIKE v_pattern ESCAPE '|'
+           OR s.NationalIdentificationNumber          LIKE v_pattern ESCAPE '|')
+    ORDER BY
+        -- Mỗi CASE chỉ có giá trị khi khóa tương ứng được chọn (còn lại = NULL, hằng số)
+        CASE WHEN p_SortBy = 'join_date'    THEN s.JoinDate END DESC,
+        CASE WHEN p_SortBy = 'availability'
+             THEN FIELD(s.AvailabilityStatus, 'available', 'busy', 'offline') END ASC,
+        CASE WHEN p_SortBy = 'rating'       THEN s.AverageRating END DESC,
+        -- Tie-break ổn định (cũng là thứ tự mặc định khi sort = 'name')
+        u.FirstName, u.LastName, s.UserID;
+END$$
+DELIMITER ;

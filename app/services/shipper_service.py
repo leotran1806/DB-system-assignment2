@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from db import FeatureNotImplementedError, call_proc, query_all
+from db import DatabaseError, FeatureNotImplementedError, call_proc, query_all
 
 
 # Keep the sort keys in a whitelist. Never interpolate an arbitrary request
@@ -21,6 +21,12 @@ SORT_OPTIONS = {
     "availability": "Trạng thái làm việc",
     "rating": "Điểm đánh giá",
 }
+
+# Allowed values (mirror the CHECK constraints in database/01_create_tables.sql).
+AVAILABILITY_VALUES = ("available", "busy", "offline")
+ACCOUNT_STATUS_VALUES = ("active", "suspended", "closed")
+VEHICLE_TYPE_VALUES = ("motorbike", "car", "van", "truck")
+SEARCH_MAX_LENGTH = 100  # sp_ListShippers.p_Search is VARCHAR(100)
 
 
 def _clean_text(value: Any) -> str | None:
@@ -33,6 +39,16 @@ def _clean_text(value: Any) -> str | None:
         return None
     normalized = str(value).strip()
     return normalized or None
+
+
+def _validate_choice(value: Any, allowed: tuple[str, ...], label: str) -> str | None:
+    """Normalize an optional filter and ensure it is one of `allowed` (or empty)."""
+    cleaned = _clean_text(value)
+    if cleaned is None:
+        return None
+    if cleaned not in allowed:
+        raise DatabaseError(f"{label} không hợp lệ. Chọn một trong: {', '.join(allowed)}.")
+    return cleaned
 
 
 def list_shippers(
@@ -58,9 +74,31 @@ def list_shippers(
        AvailabilityStatus, AccountStatus, VehicleType, LicensePlate, JoinDate,
        AverageRating, ManagedByAdminID.
     """
-    raise FeatureNotImplementedError(
-        "Chức năng danh sách chưa được cài đặt. Hãy hoàn thiện list_shippers() "
-        "và stored procedure sp_ListShippers."
+    search = _clean_text(search)
+    if search is not None and len(search) > SEARCH_MAX_LENGTH:
+        raise DatabaseError(
+            f"Từ khóa tìm kiếm tối đa {SEARCH_MAX_LENGTH} ký tự."
+        )
+    availability = _validate_choice(
+        availability, AVAILABILITY_VALUES, "Trạng thái làm việc"
+    )
+    account_status = _validate_choice(
+        account_status, ACCOUNT_STATUS_VALUES, "Trạng thái tài khoản"
+    )
+    vehicle_type = _validate_choice(vehicle_type, VEHICLE_TYPE_VALUES, "Loại xe")
+    sort_key = _clean_text(sort) or "name"
+    if sort_key not in SORT_OPTIONS:
+        raise DatabaseError(
+            "Tiêu chí sắp xếp không hợp lệ. Chọn một trong: "
+            + ", ".join(SORT_OPTIONS)
+            + "."
+        )
+
+    # Filtering and ORDER BY are done inside the stored procedure (A2 2.3).
+    # Last argument (UserID) is NULL = do not restrict to a single shipper.
+    return call_proc(
+        "sp_ListShippers",
+        [search, availability, account_status, vehicle_type, sort_key, None],
     )
 
 
@@ -142,9 +180,17 @@ def get_shipper(user_id: int) -> dict[str, Any] | None:
        read-only procedure if the list procedure is not suitable.
     3. Return one dictionary or None. Keep aliases consistent with the template.
     """
-    raise FeatureNotImplementedError(
-        "Chức năng lấy chi tiết Shipper chưa được cài đặt."
+    try:
+        shipper_id = int(user_id)
+    except (TypeError, ValueError):
+        raise DatabaseError("UserID phải là số nguyên dương.") from None
+    if shipper_id <= 0:
+        raise DatabaseError("UserID phải là số nguyên dương.")
+
+    rows = call_proc(
+        "sp_ListShippers", [None, None, None, None, "name", shipper_id]
     )
+    return rows[0] if rows else None
 
 
 def list_admins() -> list[dict[str, Any]]:
@@ -156,4 +202,10 @@ def list_admins() -> list[dict[str, Any]]:
     3. Return dictionaries with UserID and FullName keys.
     This is lookup/read-only data; do not create another write procedure for it.
     """
-    raise FeatureNotImplementedError("Danh sách Admin quản lý chưa được cài đặt.")
+    return query_all(
+        "SELECT a.UserID AS UserID, "
+        "       CONCAT_WS(' ', u.LastName, u.FirstName) AS FullName "
+        "  FROM ADMIN a "
+        "  JOIN `USER` u ON u.UserID = a.UserID "
+        " ORDER BY u.FirstName, u.LastName, a.UserID"
+    )
