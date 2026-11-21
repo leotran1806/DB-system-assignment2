@@ -1,8 +1,8 @@
 -- ============================================================================
--- 02_sample_data.sql | A2 - Section 1.2 (1 point)
--- STARTER FILE: add meaningful INSERT statements. Do not leave this file empty.
--- Requirement: at least 5 rows in EACH of the 16 tables.
+-- 02_sample_data.sql | Integrated sample dataset for all 16 tables
+-- Provides related customer, admin, shipper, delivery and reporting records.
 -- ============================================================================
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE parcel_delivery;
 
 -- IMPORTANT: respect foreign-key dependency order. A recommended order is:
@@ -65,16 +65,16 @@ INSERT INTO ADMIN (UserID, EmployeeCode, Department, AccessLevel, HireDate, Supe
 -- CUSTOMER (10 rows). 91009 is suspended, 91010 is closed.
 -- NOTE: LoyaltyPoint must equal earned minus redeemed points in POINT_TRANSACTION.
 INSERT INTO CUSTOMER (UserID, LoyaltyPoint) VALUES
-(91001, 1200),
-(91002, 350),
+(91001, 0),
+(91002, 0),
 (91003, 0),
-(91004, 2500),
-(91005, 90),
-(91006, 640),
-(91007, 150),
-(91008, 30),
-(91009, 500),
-(91010, 0);
+(91004, 0),
+(91005, 0),
+(91006, 30),
+(91007, 30),
+(91008, 50),
+(91009, 40),
+(91010, 25);
 
 -- SHIPPER (10 rows). 91209 is suspended and 91210 is closed, so both are offline.
 INSERT INTO SHIPPER (UserID, NationalIdentificationNumber, AvailabilityStatus, JoinDate, ManagedByAdminID) VALUES
@@ -153,19 +153,36 @@ INSERT INTO DELIVERY_ORDER (OrderID, CustomerID, PickupAddressDetail, PickupDist
 (92004,91004,'123 Nguyen Van Cu','District 5','Ho Chi Minh City','268 Ly Thuong Kiet','District 10','Ho Chi Minh City','2026-11-01 08:00:00','Standard','Sender 4','0901234504','Receiver 4','0911234504',5.50,100000,'completed','Demo order 4','2026-11-01 11:00:00',NULL),
 (92005,91005,'123 Nguyen Van Cu','District 5','Ho Chi Minh City','268 Ly Thuong Kiet','District 10','Ho Chi Minh City','2026-11-01 08:00:00','Standard','Sender 5','0901234505','Receiver 5','0911234505',5.50,100000,'cancelled','Demo order 5',NULL,'Customer requested cancellation'),
 -- Additional completed orders to support Group C entities (FEEDBACK, SHIPPER_EARNING):
-(92006,6,'45 Le Duan','District 1','Ho Chi Minh City','12 Vo Van Ngan','Thu Duc City','Ho Chi Minh City','2026-11-02 08:30:00','Express','Sender 6','0901234506','Receiver 6','0911234506',12.00,0,'completed','Delivered on time','2026-11-02 11:30:00',NULL),
-(92007,7,'78 Tran Hung Dao','District 5','Ho Chi Minh City','99 Cong Hoa','Tan Binh District','Ho Chi Minh City','2026-11-02 09:15:00','Standard','Sender 7','0901234507','Receiver 7','0911234507',8.20,50000,'completed','Delivered safely','2026-11-02 13:45:00',NULL),
-(92008,9,'101 Cach Mang Thang 8','District 3','Ho Chi Minh City','55 Nguyen Thi Minh Khai','District 1','Ho Chi Minh City','2026-11-03 14:00:00','Standard','Sender 8','0901234508','Receiver 8','0911234508',4.50,200000,'completed','Fragile item delivered','2026-11-03 16:00:00',NULL),
-(92009,11,'202 Hoang Van Thu','Phu Nhuan District','Ho Chi Minh City','15 Ba Huyen Thanh Quan','District 3','Ho Chi Minh City','2026-11-04 08:00:00','Express','Sender 9','0901234509','Receiver 9','0911234509',6.00,0,'completed','Fast delivery completed','2026-11-04 10:00:00',NULL),
-(92010,12,'88 Nguyen Trai','District 5','Ho Chi Minh City','33 Dien Bien Phu','Binh Thanh District','Ho Chi Minh City','2026-11-04 13:00:00','Standard','Sender 10','0901234510','Receiver 10','0911234510',7.50,150000,'completed','Delivered to recipient','2026-11-04 15:30:00',NULL);
+(92006,91006,'45 Le Duan','District 1','Ho Chi Minh City','12 Vo Van Ngan','Thu Duc City','Ho Chi Minh City','2026-11-02 08:30:00','Express','Sender 6','0901234506','Receiver 6','0911234506',12.00,0,'completed','Delivered on time','2026-11-02 11:30:00',NULL),
+(92007,91007,'78 Tran Hung Dao','District 5','Ho Chi Minh City','99 Cong Hoa','Tan Binh District','Ho Chi Minh City','2026-11-02 09:15:00','Standard','Sender 7','0901234507','Receiver 7','0911234507',8.20,50000,'completed','Delivered safely','2026-11-02 13:45:00',NULL),
+(92008,91008,'101 Cach Mang Thang 8','District 3','Ho Chi Minh City','55 Nguyen Thi Minh Khai','District 1','Ho Chi Minh City','2026-11-03 14:00:00','Standard','Sender 8','0901234508','Receiver 8','0911234508',4.50,200000,'completed','Fragile item delivered','2026-11-03 16:00:00',NULL),
+(92009,91009,'202 Hoang Van Thu','Phu Nhuan District','Ho Chi Minh City','15 Ba Huyen Thanh Quan','District 3','Ho Chi Minh City','2026-11-04 08:00:00','Express','Sender 9','0901234509','Receiver 9','0911234509',6.00,0,'completed','Fast delivery completed','2026-11-04 10:00:00',NULL),
+(92010,91010,'88 Nguyen Trai','District 5','Ho Chi Minh City','33 Dien Bien Phu','Binh Thanh District','Ho Chi Minh City','2026-11-04 13:00:00','Standard','Sender 10','0901234510','Receiver 10','0911234510',7.50,150000,'completed','Delivered to recipient','2026-11-04 15:30:00',NULL);
 
--- TODO 9: INSERT >= 5 PACKAGE rows.
---        Link to existing orders; use meaningful descriptions/categories and
---        valid positive dimensions/weight. Ensure at least one package per order.
+-- 9) PACKAGE — at least one package for each seeded delivery order.
+INSERT INTO `PACKAGE` (PackageID, OrderID, PackageDescription, PackageCategory, Weight, Length, Width, Height, DeclaredValue, IsFragile) VALUES
+(1, 92001, 'Small document parcel', 'Documents', 0.50, 22, 16, 2, 100000, FALSE),
+(2, 92002, 'Clothing package', 'Clothing', 1.20, 30, 25, 10, 350000, FALSE),
+(3, 92003, 'Kitchen appliance', 'Electronics', 4.50, 40, 35, 25, 1800000, TRUE),
+(4, 92004, 'Glassware set', 'Household', 3.20, 35, 30, 22, 900000, TRUE),
+(5, 92005, 'Books', 'Books', 2.00, 28, 20, 12, 250000, FALSE),
+(6, 92006, 'Computer accessories', 'Electronics', 1.80, 32, 24, 8, 1200000, TRUE),
+(7, 92007, 'Shoes', 'Fashion', 1.10, 34, 22, 13, 650000, FALSE),
+(8, 92008, 'Cosmetics box', 'Personal care', 0.90, 25, 18, 12, 450000, TRUE),
+(9, 92009, 'Office supplies', 'Stationery', 2.40, 36, 28, 15, 300000, FALSE),
+(10, 92010, 'Sports equipment', 'Sports', 5.00, 50, 30, 20, 1500000, FALSE);
 
--- TODO 10: INSERT >= 5 DELIVERY_ASSIGNMENT rows.
---         Include offered/rejected/accepted/completed statuses and valid dates.
---         Do not seed two simultaneously active assignments for one order.
+-- 10) DELIVERY_ASSIGNMENT — one completed/active assignment per applicable order.
+-- VehicleID belongs to the shipper recorded in each row.
+INSERT INTO DELIVERY_ASSIGNMENT (OrderID, AssignmentNo, ShipperID, VehicleID, AssignedDate, AcceptedDate, CompleteDate, AssignmentStatus, RejectionReason) VALUES
+(92002, 1, 91201, 1, '2026-11-01 08:45:00', '2026-11-01 09:00:00', NULL, 'accepted', NULL),
+(92003, 1, 91203, 3, '2026-11-01 09:30:00', '2026-11-01 09:45:00', NULL, 'accepted', NULL),
+(92004, 1, 91201, 1, '2026-11-01 09:00:00', '2026-11-01 09:10:00', '2026-11-01 11:00:00', 'completed', NULL),
+(92006, 1, 91202, 2, '2026-11-02 09:00:00', '2026-11-02 09:10:00', '2026-11-02 11:30:00', 'completed', NULL),
+(92007, 1, 91203, 3, '2026-11-02 10:00:00', '2026-11-02 10:10:00', '2026-11-02 13:45:00', 'completed', NULL),
+(92008, 1, 91204, 4, '2026-11-03 14:20:00', '2026-11-03 14:30:00', '2026-11-03 16:00:00', 'completed', NULL),
+(92009, 1, 91206, 6, '2026-11-04 08:20:00', '2026-11-04 08:30:00', '2026-11-04 10:00:00', 'completed', NULL),
+(92010, 1, 91202, 2, '2026-11-04 13:20:00', '2026-11-04 13:30:00', '2026-11-04 15:30:00', 'completed', NULL);
 --
 -- 11: Duy — requires USER IDs 91001..91005 from group A.
 INSERT INTO ORDER_STATUS_LOG (StatusLogID,OrderID,ChangedByUserID,Status,ChangedDate,Note) VALUES
@@ -182,16 +199,16 @@ INSERT INTO ORDER_STATUS_LOG (StatusLogID,OrderID,ChangedByUserID,Status,Changed
 (93011,92005,91005,'placed','2026-11-01 08:00:00','Demo status history'),
 (93012,92005,91005,'cancelled','2026-11-01 09:00:00','Demo status history'),
 -- Status logs for additional completed orders:
-(93013,92006,6,'placed','2026-11-02 08:30:00','Order placed'),
-(93014,92006,17,'completed','2026-11-02 11:30:00','Order completed'),
-(93015,92007,7,'placed','2026-11-02 09:15:00','Order placed'),
-(93016,92007,18,'completed','2026-11-02 13:45:00','Order completed'),
-(93017,92008,9,'placed','2026-11-03 14:00:00','Order placed'),
-(93018,92008,19,'completed','2026-11-03 16:00:00','Order completed'),
-(93019,92009,11,'placed','2026-11-04 08:00:00','Order placed'),
-(93020,92009,21,'completed','2026-11-04 10:00:00','Order completed'),
-(93021,92010,12,'placed','2026-11-04 13:00:00','Order placed'),
-(93022,92010,17,'completed','2026-11-04 15:30:00','Order completed');
+(93013,92006,91006,'placed','2026-11-02 08:30:00','Order placed'),
+(93014,92006,91202,'completed','2026-11-02 11:30:00','Order completed'),
+(93015,92007,91007,'placed','2026-11-02 09:15:00','Order placed'),
+(93016,92007,91203,'completed','2026-11-02 13:45:00','Order completed'),
+(93017,92008,91008,'placed','2026-11-03 14:00:00','Order placed'),
+(93018,92008,91204,'completed','2026-11-03 16:00:00','Order completed'),
+(93019,92009,91009,'placed','2026-11-04 08:00:00','Order placed'),
+(93020,92009,91206,'completed','2026-11-04 10:00:00','Order completed'),
+(93021,92010,91010,'placed','2026-11-04 13:00:00','Order placed'),
+(93022,92010,91202,'completed','2026-11-04 15:30:00','Order completed');
 
 -- ============================================================================
 -- GROUP C DATA: PAYMENT — Lê Tuấn (6 rows)
@@ -219,37 +236,37 @@ INSERT INTO APPLIED_TO (OrderID, PromotionID, DiscountAmount, AppliedDate) VALUE
 -- GROUP C DATA: POINT_TRANSACTION — Lê Tuấn (7 rows)
 -- ============================================================================
 INSERT INTO POINT_TRANSACTION (PointTransactionID, CustomerID, OrderID, PointAmount, TransactionType, TransactionDate, Description) VALUES
-(1, 6, 92006, 50, 'earn', '2026-11-02 11:35:00', 'Points earned for completing order 92006'),
-(2, 6, NULL, -20, 'redeem', '2026-11-02 15:00:00', 'Points redeemed for discount voucher'),
-(3, 7, 92007, 30, 'earn', '2026-11-02 13:50:00', 'Points earned for completing order 92007'),
-(4, 9, 92008, 100, 'earn', '2026-11-03 16:05:00', 'Points earned for completing order 92008'),
-(5, 9, NULL, -50, 'redeem', '2026-11-03 18:00:00', 'Points redeemed for shopping discount'),
-(6, 11, 92009, 40, 'earn', '2026-11-04 10:05:00', 'Points earned for completing order 92009'),
-(7, 12, 92010, 25, 'earn', '2026-11-04 15:35:00', 'Points earned for completing order 92010');
+(1, 91006, 92006, 50, 'earn', '2026-11-02 11:35:00', 'Points earned for completing order 92006'),
+(2, 91006, NULL, -20, 'redeem', '2026-11-02 15:00:00', 'Points redeemed for discount voucher'),
+(3, 91007, 92007, 30, 'earn', '2026-11-02 13:50:00', 'Points earned for completing order 92007'),
+(4, 91008, 92008, 100, 'earn', '2026-11-03 16:05:00', 'Points earned for completing order 92008'),
+(5, 91008, NULL, -50, 'redeem', '2026-11-03 18:00:00', 'Points redeemed for shopping discount'),
+(6, 91009, 92009, 40, 'earn', '2026-11-04 10:05:00', 'Points earned for completing order 92009'),
+(7, 91010, 92010, 25, 'earn', '2026-11-04 15:35:00', 'Points earned for completing order 92010');
 
 -- ============================================================================
 -- GROUP C DATA: FEEDBACK — Lê Tuấn (6 rows)
 -- Trigger trg_feedback_after_insert updates SHIPPER.AverageRating automatically!
 -- ============================================================================
 INSERT INTO FEEDBACK (FeedbackID, OrderID, CustomerID, ShipperID, Rating, Comment, CreatedDate, FeedbackType) VALUES
-(1, 92004, 91004, 16, 5, 'Fast and very careful delivery, polite shipper!', '2026-11-01 11:30:00', 'customer'),
-(2, 92004, 91004, 16, 5, 'Friendly customer, quick handover.', '2026-11-01 11:35:00', 'shipper'),
-(3, 92006, 6, 17, 4, 'On-time delivery, friendly demeanor.', '2026-11-02 12:00:00', 'customer'),
-(4, 92007, 7, 18, 5, 'Excellent service, handled fragile goods safely.', '2026-11-02 14:00:00', 'customer'),
-(5, 92008, 9, 19, 4, 'Great delivery experience, will order again.', '2026-11-03 16:30:00', 'customer'),
-(6, 92009, 11, 21, 5, 'Super prompt delivery, very professional.', '2026-11-04 10:15:00', 'customer');
+(1, 92004, 91004, 91201, 5, 'Fast and very careful delivery, polite shipper!', '2026-11-01 11:30:00', 'customer'),
+(2, 92004, 91004, 91201, 5, 'Friendly customer, quick handover.', '2026-11-01 11:35:00', 'shipper'),
+(3, 92006, 91006, 91202, 4, 'On-time delivery, friendly demeanor.', '2026-11-02 12:00:00', 'customer'),
+(4, 92007, 91007, 91203, 5, 'Excellent service, handled fragile goods safely.', '2026-11-02 14:00:00', 'customer'),
+(5, 92008, 91008, 91204, 4, 'Great delivery experience, will order again.', '2026-11-03 16:30:00', 'customer'),
+(6, 92009, 91009, 91206, 5, 'Super prompt delivery, very professional.', '2026-11-04 10:15:00', 'customer');
 
 -- ============================================================================
 -- GROUP C DATA: SHIPPER_EARNING — Lê Tuấn (6 rows)
 -- NetEarning is automatically computed as DeliveryFee - PlatformCommission.
 -- ============================================================================
 INSERT INTO SHIPPER_EARNING (EarningID, ShipperID, OrderID, DeliveryFee, PlatformCommission, EarningDate, PayoutStatus, PayoutDate) VALUES
-(1, 16, 92004, 100000.00, 20000.00, '2026-11-01 11:00:00', 'paid', '2026-11-01 18:00:00'),
-(2, 17, 92006, 150000.00, 30000.00, '2026-11-02 11:30:00', 'paid', '2026-11-02 18:00:00'),
-(3, 18, 92007, 80000.00, 16000.00, '2026-11-02 13:45:00', 'paid', '2026-11-02 18:00:00'),
-(4, 19, 92008, 120000.00, 24000.00, '2026-11-03 16:00:00', 'pending', NULL),
-(5, 21, 92009, 200000.00, 40000.00, '2026-11-04 10:00:00', 'pending', NULL),
-(6, 17, 92010, 180000.00, 36000.00, '2026-11-04 15:30:00', 'paid', '2026-11-04 19:00:00');
+(1, 91201, 92004, 100000.00, 20000.00, '2026-11-01 11:00:00', 'paid', '2026-11-01 18:00:00'),
+(2, 91202, 92006, 150000.00, 30000.00, '2026-11-02 11:30:00', 'paid', '2026-11-02 18:00:00'),
+(3, 91203, 92007, 80000.00, 16000.00, '2026-11-02 13:45:00', 'paid', '2026-11-02 18:00:00'),
+(4, 91204, 92008, 120000.00, 24000.00, '2026-11-03 16:00:00', 'pending', NULL),
+(5, 91206, 92009, 200000.00, 40000.00, '2026-11-04 10:00:00', 'pending', NULL),
+(6, 91202, 92010, 180000.00, 36000.00, '2026-11-04 15:30:00', 'paid', '2026-11-04 19:00:00');
 
 -- Verification of row counts for Group B:
 SELECT COUNT(*) AS DeliveryOrderCount FROM DELIVERY_ORDER;

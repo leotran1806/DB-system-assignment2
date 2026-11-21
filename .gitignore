@@ -1,7 +1,8 @@
 .env
 .venv/
+venv/
 __pycache__/
 *.py[cod]
+*.log
 .pytest_cache/
-instance/
 .DS_Store

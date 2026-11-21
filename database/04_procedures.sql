@@ -1,36 +1,10 @@
 -- ============================================================================
--- 04_procedures.sql | A2 - Sections 2.1 (1 point) and 2.3 (1 point)
--- STARTER FILE: implement the five procedures below.
--- CRUD target selected for 2.1: SHIPPER.
+-- 04_procedures.sql | Stored procedures for shipper management and reporting
+-- MySQL 8.0.16+
 -- ============================================================================
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE parcel_delivery;
 
--- ---------------------------------------------------------------------------
--- 2.1: CRUD procedures for SHIPPER
--- For the report, explain the deletion policy and why it is needed.
--- Suggested policy:
---   * Physical deletion is allowed only when the shipper has no delivery
---     assignments/history, no earnings, no feedback and no dependent records
---     that must be preserved.
---   * If the shipper has historical business records, preserve those records;
---     either reject deletion with a specific message OR mark account closed and
---     availability offline. State which policy your team chose.
---   * Purpose: remove erroneous/test profiles while preserving delivery/audit
---     history and referential integrity for real shippers.
---
--- Validation checklist for INSERT and UPDATE:
---   [ ] target shipper exists for UPDATE / does not already exist for INSERT
---   [ ] referenced USER and optional ADMIN exist
---   [ ] NIN is 9 or 12 digits and unique (exclude current UserID on UPDATE)
---   [ ] AvailabilityStatus is available/busy/offline
---   [ ] JoinDate has an accepted value
---   [ ] account state is compatible with availability if you validate USER too
---   [ ] clear SIGNAL SQLSTATE '45000' message for every specific failure
---   [ ] transaction + rollback if the routine changes dependent tables
---
--- ---------------------------------------------------------------------------
--- sp_InsertShipper: create USER + SHIPPER + VEHICLE + SHIPPER_LICENSE in one transaction
--- ---------------------------------------------------------------------------
 DELIMITER $$
 
 DROP PROCEDURE IF EXISTS sp_InsertShipper$$
@@ -131,6 +105,9 @@ BEGIN
     IF p_LicenseExpiryDate <= p_LicenseIssueDate THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Licence expiry date must be after the issue date.';
     END IF;
+    IF p_LicenseIssueDate > CURDATE() THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The driving licence issue date cannot be in the future.';
+    END IF;
     IF p_LicenseExpiryDate < CURDATE() THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The driving licence has expired.';
     END IF;
@@ -191,123 +168,156 @@ BEGIN
     SELECT v_NewUserID AS NewShipperID, 'Shipper created successfully.' AS Message;
 END$$
 
-DELIMITER ;
 
--- Template signatures (uncomment and complete one at a time):
--- DELIMITER $$
--- CREATE PROCEDURE sp_InsertShipper(
---     IN p_UserID INT,
---     IN p_NationalIdentificationNumber VARCHAR(12),
---     IN p_AvailabilityStatus VARCHAR(20),
---     IN p_JoinDate DATE,
---     IN p_ManagedByAdminID INT
--- )
--- BEGIN
---     -- TODO: validation SELECT COUNT(*) INTO variables; SIGNAL on each error.
---     -- TODO: INSERT into SHIPPER after all validations pass.
--- END$$
---
--- CREATE PROCEDURE sp_UpdateShipper(
---     IN p_UserID INT,
---     IN p_NationalIdentificationNumber VARCHAR(12),
---     IN p_AvailabilityStatus VARCHAR(20),
---     IN p_JoinDate DATE,
---     IN p_ManagedByAdminID INT
--- )
--- BEGIN
---     -- TODO: existence check, field validation, unique check excluding p_UserID.
---     -- TODO: UPDATE SHIPPER and return a success result.
--- END$$
---
--- CREATE PROCEDURE sp_DeleteShipper(IN p_UserID INT)
--- BEGIN
---     -- TODO: check dependencies/history; implement and document delete policy.
--- END$$
 
--- ---------------------------------------------------------------------------
--- 2.3: TWO QUERY-ONLY stored procedures
--- Both procedures must contain SELECT statements only (no INSERT/UPDATE/DELETE).
--- Their input parameters must be used in WHERE and/or HAVING filters.
--- ---------------------------------------------------------------------------
-
--- TODO procedure 4: sp_ListShippers (query 1)
--- Required: JOIN at least two tables (recommended USER + SHIPPER + VEHICLE),
--- WHERE filters and ORDER BY. Input parameters should correspond to filters:
--- p_Search, p_AvailabilityStatus, p_AccountStatus, p_VehicleType, p_SortBy.
--- It must retrieve SHIPPER data because this is the CRUD table in 2.1.
--- Suggested output aliases expected by the current template:
--- UserID, FullName, Email, PhoneNumber, NationalIdentificationNumber,
--- AvailabilityStatus, AccountStatus, VehicleType, LicensePlate, JoinDate,
--- AverageRating, ManagedByAdminID.
--- Validate/whitelist p_SortBy. Use CASE expressions in ORDER BY rather than
--- concatenating arbitrary user-provided SQL text.
-
--- TODO procedure 5: sp_RevenueByShipper (query 2)
--- Required: JOIN at least two tables, WHERE, aggregate functions (SUM/COUNT),
--- GROUP BY, HAVING, ORDER BY. Input parameters: p_FromDate, p_ToDate,
--- p_MinOrders (or other values actually used by WHERE/HAVING).
--- Recommended joins: SHIPPER + USER + SHIPPER_EARNING.
--- Output aliases expected by reports/index.html:
--- ShipperID, ShipperName, TotalOrders, TotalDeliveryFee,
--- TotalCommission, TotalNetEarning.
--- It must be a read-only procedure; use its output in the Reports screen.
-
--- Template query-only procedure structure:
--- CREATE PROCEDURE sp_ListShippers(IN p_Search VARCHAR(100), ...)
--- BEGIN
---     SELECT ...
---       FROM SHIPPER s
---       JOIN `USER` u ON ...
---       LEFT JOIN VEHICLE v ON ...
---      WHERE (p_Search IS NULL OR ...)
---        AND (p_AvailabilityStatus IS NULL OR ...)
---      ORDER BY ...;
--- END$$
---
-DROP PROCEDURE IF EXISTS sp_RevenueByShipper$$
-CREATE PROCEDURE sp_RevenueByShipper(IN fromDate DATE, IN toDate DATE, IN minOrders INT)
+DROP PROCEDURE IF EXISTS sp_UpdateShipper$$
+CREATE PROCEDURE sp_UpdateShipper(
+    IN p_UserID INT,
+    IN p_NationalIdentificationNumber VARCHAR(12),
+    IN p_AvailabilityStatus VARCHAR(20),
+    IN p_JoinDate DATE,
+    IN p_ManagedByAdminID INT
+)
+MODIFIES SQL DATA
 BEGIN
-    IF fromDate is NULL or toDate is NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This field cannot be empty';
+    DECLARE v_AccountStatus VARCHAR(20);
+    DECLARE v_exists INT DEFAULT 0;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    IF p_UserID IS NULL OR p_UserID <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Shipper ID must be a positive integer.';
     END IF;
-    IF fromDate > toDate THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'From date cannot be after to date';
+
+    SELECT COUNT(*) INTO v_exists FROM SHIPPER WHERE UserID = p_UserID;
+    IF v_exists = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Shipper does not exist.';
     END IF;
-    IF minOrders is NULL OR minOrders < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Minimum orders not be NULL or negative';
+
+    IF p_NationalIdentificationNumber IS NULL
+       OR p_NationalIdentificationNumber NOT REGEXP '^0[0-9]{11}$' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'National ID must contain 12 digits and start with 0.';
     END IF;
-    SELECT u.UserID AS ShipperID,
-           CONCAT(u.LastName, ' ', u.FirstName) AS ShipperName,
-           COUNT(se.EarningID) AS TotalOrders,
-           SUM(se.DeliveryFee) AS TotalDeliveryFee,
-           SUM(se.PlatformCommission) AS TotalCommission,
-           SUM(se.DeliveryFee - se.PlatformCommission) AS TotalNetEarning
-        FROM `USER` u 
-        JOIN SHIPPER s ON u.UserID = s.UserID
-        JOIN SHIPPER_EARNING se ON u.UserID = se.ShipperID
-        WHERE se.EarningDate >= fromDate AND se.EarningDate < DATE_ADD(toDate, INTERVAL 1 DAY)
-        GROUP BY u.UserID, u.LastName, u.FirstName
-        HAVING COUNT(se.EarningID) >= minOrders
-        ORDER BY ShipperID ASC;
+
+    IF EXISTS (
+        SELECT 1 FROM SHIPPER
+        WHERE NationalIdentificationNumber = p_NationalIdentificationNumber
+          AND UserID <> p_UserID
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This national ID is already assigned to another shipper.';
+    END IF;
+
+    IF p_AvailabilityStatus IS NULL
+       OR p_AvailabilityStatus NOT IN ('available', 'busy', 'offline') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Availability must be available, busy or offline.';
+    END IF;
+
+    IF p_JoinDate IS NULL OR p_JoinDate > CURDATE() THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Join date must be provided and cannot be in the future.';
+    END IF;
+
+    IF p_ManagedByAdminID IS NULL OR p_ManagedByAdminID <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A managing administrator must be selected.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM ADMIN WHERE UserID = p_ManagedByAdminID) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The selected administrator does not exist.';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM ADMIN a JOIN `USER` u ON u.UserID = a.UserID
+        WHERE a.UserID = p_ManagedByAdminID AND u.AccountStatus = 'active'
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The selected administrator account is not active.';
+    END IF;
+
+    SELECT AccountStatus INTO v_AccountStatus
+    FROM `USER` WHERE UserID = p_UserID;
+    IF v_AccountStatus <> 'active' AND p_AvailabilityStatus <> 'offline' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Suspended or closed shipper accounts must remain offline.';
+    END IF;
+
+    IF p_AvailabilityStatus = 'offline' AND EXISTS (
+        SELECT 1 FROM DELIVERY_ASSIGNMENT
+        WHERE ShipperID = p_UserID AND AssignmentStatus = 'accepted'
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This shipper has an accepted assignment and cannot be set offline.';
+    END IF;
+
+    START TRANSACTION;
+    UPDATE SHIPPER
+       SET NationalIdentificationNumber = p_NationalIdentificationNumber,
+           AvailabilityStatus = p_AvailabilityStatus,
+           JoinDate = p_JoinDate,
+           ManagedByAdminID = p_ManagedByAdminID
+     WHERE UserID = p_UserID;
+    COMMIT;
+
+    SELECT 'updated' AS Action, p_UserID AS UserID, 'Shipper updated successfully.' AS Message;
 END$$
-DELIMETER ;
--- CREATE PROCEDURE sp_RevenueByShipper(IN p_FromDate DATE, ...)
--- BEGIN
---     SELECT ..., COUNT(...), SUM(...)
---       FROM SHIPPER_EARNING e
---       JOIN SHIPPER s ON ...
---       JOIN `USER` u ON ...
---      WHERE e.EarningDate >= p_FromDate
---        AND e.EarningDate < DATE_ADD(p_ToDate, INTERVAL 1 DAY)
---      GROUP BY ...
---     HAVING COUNT(...) >= p_MinOrders
---      ORDER BY ...;
--- END$$
--- DELIMITER ;
 
-DROP PROCEDURE IF EXISTS sp_ListShippers;
+DROP PROCEDURE IF EXISTS sp_DeleteShipper$$
+CREATE PROCEDURE sp_DeleteShipper(IN p_UserID INT)
+MODIFIES SQL DATA
+BEGIN
+    DECLARE v_exists INT DEFAULT 0;
+    DECLARE v_has_history INT DEFAULT 0;
+    DECLARE v_action VARCHAR(20) DEFAULT 'deleted';
 
-DELIMITER $$
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    IF p_UserID IS NULL OR p_UserID <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Shipper ID must be a positive integer.';
+    END IF;
+
+    SELECT COUNT(*) INTO v_exists FROM SHIPPER WHERE UserID = p_UserID;
+    IF v_exists = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Shipper does not exist.';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM DELIVERY_ASSIGNMENT
+        WHERE ShipperID = p_UserID AND AssignmentStatus = 'accepted'
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Shipper has an accepted delivery assignment and cannot be deleted yet.';
+    END IF;
+
+    SET v_has_history =
+        EXISTS (SELECT 1 FROM DELIVERY_ASSIGNMENT WHERE ShipperID = p_UserID)
+        OR EXISTS (SELECT 1 FROM SHIPPER_EARNING WHERE ShipperID = p_UserID)
+        OR EXISTS (SELECT 1 FROM FEEDBACK WHERE ShipperID = p_UserID)
+        OR EXISTS (SELECT 1 FROM ORDER_STATUS_LOG WHERE ChangedByUserID = p_UserID)
+        OR EXISTS (SELECT 1 FROM CUSTOMER WHERE UserID = p_UserID)
+        OR EXISTS (SELECT 1 FROM ADMIN WHERE UserID = p_UserID OR Supervisor_ID = p_UserID)
+        OR EXISTS (SELECT 1 FROM `USER` WHERE UserID = p_UserID AND AccountStatus = 'closed');
+
+    START TRANSACTION;
+    IF v_has_history = 1 THEN
+        UPDATE `USER` SET AccountStatus = 'closed' WHERE UserID = p_UserID;
+        UPDATE SHIPPER SET AvailabilityStatus = 'offline' WHERE UserID = p_UserID;
+        SET v_action = 'deactivated';
+    ELSE
+        DELETE FROM VEHICLE WHERE ShipperID = p_UserID;
+        DELETE FROM SHIPPER_LICENSE WHERE ShipperID = p_UserID;
+        DELETE FROM SHIPPER WHERE UserID = p_UserID;
+        DELETE FROM `USER` WHERE UserID = p_UserID;
+        SET v_action = 'deleted';
+    END IF;
+    COMMIT;
+
+    SELECT v_action AS Action, p_UserID AS UserID,
+           IF(v_action = 'deleted', 'Shipper permanently deleted.', 'Shipper deactivated; historical data was preserved.') AS Message;
+END$$
+
+
+DROP PROCEDURE IF EXISTS sp_ListShippers$$
 CREATE PROCEDURE sp_ListShippers(
     IN p_Search             VARCHAR(100),  -- NULL/'' = không lọc
     IN p_AvailabilityStatus VARCHAR(20),   -- available | busy | offline
@@ -401,4 +411,38 @@ BEGIN
         -- Tie-break ổn định (cũng là thứ tự mặc định khi sort = 'name')
         u.FirstName, u.LastName, s.UserID;
 END$$
+
+DROP PROCEDURE IF EXISTS sp_RevenueByShipper$$
+CREATE PROCEDURE sp_RevenueByShipper(
+    IN p_FromDate DATE,
+    IN p_ToDate DATE,
+    IN p_MinOrders INT
+)
+READS SQL DATA
+BEGIN
+    IF p_FromDate IS NULL OR p_ToDate IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Start date and end date are required.';
+    END IF;
+    IF p_FromDate > p_ToDate THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Start date cannot be after end date.';
+    END IF;
+    IF p_MinOrders IS NULL OR p_MinOrders < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Minimum order count must be zero or greater.';
+    END IF;
+
+    SELECT u.UserID AS ShipperID,
+           CONCAT(u.LastName, ' ', u.FirstName) AS ShipperName,
+           COUNT(se.EarningID) AS TotalOrders,
+           SUM(se.DeliveryFee) AS TotalDeliveryFee,
+           SUM(se.PlatformCommission) AS TotalCommission,
+           SUM(se.DeliveryFee - se.PlatformCommission) AS TotalNetEarning
+        FROM `USER` u 
+        JOIN SHIPPER s ON u.UserID = s.UserID
+        JOIN SHIPPER_EARNING se ON u.UserID = se.ShipperID
+        WHERE se.EarningDate >= p_FromDate AND se.EarningDate < DATE_ADD(p_ToDate, INTERVAL 1 DAY)
+        GROUP BY u.UserID, u.LastName, u.FirstName
+        HAVING COUNT(se.EarningID) >= p_MinOrders
+        ORDER BY ShipperID ASC;
+END$$
+
 DELIMITER ;

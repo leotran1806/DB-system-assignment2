@@ -1,12 +1,7 @@
-"""Reusable MySQL helpers.
-
-The connection helpers below are infrastructure, not the assignment's business
-logic. Complete the SQL procedures/functions first, then call them from services.
-All INSERT/UPDATE/DELETE operations in the application must use call_proc().
-Direct query_all() calls are reserved for SELECT-only lookup data.
-"""
+"""MySQL access helpers used by the application service layer."""
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable
 
 import mysql.connector
@@ -28,51 +23,51 @@ class FeatureNotImplementedError(RuntimeError):
     """Raised by starter service methods until the student implements them."""
 
 
-def get_connection():
-    """Open a MySQL connection.
-
-    TODO (only if needed): add connection pooling or explicit connection timeouts.
-    Keep credentials in .env; never hard-code them in this file.
-    """
-    try:
-        return mysql.connector.connect(**DB_CONFIG)
-    except Error as err:
-        raise DatabaseError(_friendly_message(err), err.errno) from err
-
-
 def _friendly_message(err: Error) -> str:
-    """Convert common MySQL errors into clear Vietnamese UI messages."""
     errno = getattr(err, "errno", None)
-    if errno in (2002, 2003):
-        return "Không kết nối được MySQL. Hãy kiểm tra MySQL Server, DB_HOST và DB_PORT trong .env."
+    if errno in (2002, 2003, 2005):
+        return "Cannot connect to MySQL. Check that the server is running and verify DB_HOST and DB_PORT in .env."
     if errno == 1045:
-        return "Sai tài khoản hoặc mật khẩu MySQL. Hãy kiểm tra DB_USER và DB_PASSWORD trong .env."
+        return "MySQL authentication failed. Check DB_USER and DB_PASSWORD in .env."
     if errno == 1049:
-        return "Không tìm thấy database. Hãy tạo database parcel_delivery và hoàn thành các script SQL trước."
+        return "The configured database does not exist. Run the database scripts and verify DB_NAME in .env."
     if errno == 1146:
-        return "Không tìm thấy bảng cần truy vấn. Hãy hoàn thành database/01_create_tables.sql."
+        return "A required database table is missing. Run database/01_create_tables.sql first."
     if errno == 1305:
-        return "Không tìm thấy stored procedure/function. Hãy hoàn thành và chạy các script SQL tương ứng."
+        return "A required stored procedure or function is missing. Run database/04_procedures.sql and database/05_functions.sql."
     if errno == 1644:
-        return err.msg
+        return getattr(err, "msg", "The database rejected the operation.")
     if errno == 1062:
-        return "Dữ liệu bị trùng với một giá trị đã tồn tại (ví dụ email, số điện thoại hoặc mã định danh)."
+        return "A value that must be unique is already in use (for example, an email, phone number, ID number, or license plate)."
     if errno in (1451, 1217):
-        return "Không thể xóa bản ghi vì dữ liệu đang được bảng khác tham chiếu."
+        return "This record cannot be removed because other records still reference it."
     if errno == 1452:
-        return "Khóa ngoại không hợp lệ: bản ghi được tham chiếu không tồn tại."
+        return "A referenced record does not exist. Check the selected user or administrator."
     if errno == 3819:
-        return f"Dữ liệu vi phạm CHECK constraint: {err.msg}"
-    return f"Lỗi MySQL ({errno}): {err.msg}"
+        return f"The data violates a database CHECK constraint: {getattr(err, 'msg', '')}"
+    if errno == 1292:
+        return "A date or numeric value has an invalid format."
+    return f"MySQL error ({errno}): {getattr(err, 'msg', str(err))}"
+
+
+def get_connection():
+    """Open one connection with a bounded timeout."""
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG, connection_timeout=5, use_unicode=True)
+        # Keep MySQL result decoding and parameter encoding explicitly UTF-8.
+        conn.set_charset_collation("utf8mb4", "utf8mb4_unicode_ci")
+        return conn
+    except Error as err:
+        raise DatabaseError(_friendly_message(err), getattr(err, "errno", None)) from err
 
 
 def call_proc(name: str, args: Iterable[Any] = ()) -> list[dict[str, Any]]:
-    """Call a stored procedure and return all rows from its result sets.
+    """Call a project stored procedure and collect all result-set rows."""
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name):
+        raise ValueError("Invalid stored procedure name.")
 
-    Use this helper for the 2.1 CRUD procedures and the 2.3 query procedures.
-    The service layer must validate/normalize Python inputs before calling it.
-    """
     conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -81,29 +76,30 @@ def call_proc(name: str, args: Iterable[Any] = ()) -> list[dict[str, Any]]:
         for result in cursor.stored_results():
             columns = result.column_names
             rows.extend(dict(zip(columns, row)) for row in result.fetchall())
+            result.close()
         conn.commit()
-        cursor.close()
         return rows
-    except DatabaseError:
-        if conn is not None and conn.is_connected():
-            conn.rollback()
-        raise
     except Error as err:
         if conn is not None and conn.is_connected():
             conn.rollback()
-        raise DatabaseError(_friendly_message(err), err.errno) from err
+        raise DatabaseError(_friendly_message(err), getattr(err, "errno", None)) from err
     finally:
+        if cursor is not None:
+            try:
+                cursor.close()
+            except Error:
+                pass
         if conn is not None and conn.is_connected():
             conn.close()
 
 
 def call_function(name: str, args: Iterable[Any] = ()) -> Any:
-    """Call a stored function through SELECT and return its scalar result.
+    """Call a known project stored function and return its scalar value."""
+    if name not in {"fn_ShipperReputation", "fn_ShipperBonus"}:
+        raise ValueError("Unknown stored function.")
 
-    Only use a function name authored in this project; do not pass a user value
-    as the function name. Values are passed separately as bound parameters.
-    """
     conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -111,36 +107,33 @@ def call_function(name: str, args: Iterable[Any] = ()) -> Any:
         placeholders = ", ".join(["%s"] * len(values))
         cursor.execute(f"SELECT {name}({placeholders})", values)
         row = cursor.fetchone()
-        cursor.close()
         return row[0] if row else None
-    except DatabaseError:
-        raise
     except Error as err:
-        raise DatabaseError(_friendly_message(err), err.errno) from err
+        raise DatabaseError(_friendly_message(err), getattr(err, "errno", None)) from err
     finally:
+        if cursor is not None:
+            cursor.close()
         if conn is not None and conn.is_connected():
             conn.close()
 
 
 def query_all(sql: str, args: Iterable[Any] = ()) -> list[dict[str, Any]]:
-    """Execute a SELECT-only query for lookup lists (e.g. admin dropdowns).
+    """Execute a SELECT statement used for read-only lookup data."""
+    if not sql.lstrip().upper().startswith(("SELECT", "WITH")):
+        raise ValueError("query_all() only accepts SELECT statements.")
 
-    Do not use this helper for INSERT, UPDATE or DELETE. Those operations must
-    call stored procedures to match the assignment's requirement.
-    """
     conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(sql, list(args))
         columns = cursor.column_names
-        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        cursor.close()
-        return rows
-    except DatabaseError:
-        raise
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
     except Error as err:
-        raise DatabaseError(_friendly_message(err), err.errno) from err
+        raise DatabaseError(_friendly_message(err), getattr(err, "errno", None)) from err
     finally:
+        if cursor is not None:
+            cursor.close()
         if conn is not None and conn.is_connected():
             conn.close()

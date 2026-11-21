@@ -1,24 +1,23 @@
-"""Routes for the SHIPPER management screen (A2 sections 3.1 and 3.2)."""
+"""HTTP routes for shipper administration."""
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from db import DatabaseError, FeatureNotImplementedError
+from db import DatabaseError
 from services import shipper_service as service
 
 bp = Blueprint("shippers", __name__)
 
 
+def _list_url():
+    filters = {
+        key: request.form.get(key)
+        for key in ("search", "availability", "account_status", "vehicle_type", "sort")
+        if request.form.get(key)
+    }
+    return url_for("shippers.index", **filters)
+
+
 @bp.route("/shippers", methods=["GET", "POST"])
 def index():
-    """Render the combined create/list/update/delete screen.
-
-    TODO when implementing the app:
-    - POST on this page is the INSERT action; validate required form fields and
-      call service.insert_shipper(). Never execute SQL in the route.
-    - GET calls service.list_shippers() which must call sp_ListShippers.
-    - Pass search/filter/sort values back to the template so they stay selected.
-    - Catch DatabaseError and FeatureNotImplementedError and display clear,
-      specific flash messages without breaking the page shell.
-    """
     filters = {
         "search": request.args.get("search", ""),
         "availability": request.args.get("availability", ""),
@@ -26,57 +25,56 @@ def index():
         "vehicle_type": request.args.get("vehicle_type", ""),
         "sort": request.args.get("sort", "name"),
     }
+    form_data = {}
 
     if request.method == "POST":
+        form_data = request.form.to_dict()
         try:
-            service.insert_shipper(request.form)
-            flash("Đã thêm Shipper.", "success")
+            new_id = service.insert_shipper(request.form)
+            flash(f"Shipper account created successfully (User ID: {new_id}).", "success")
             return redirect(url_for("shippers.index"))
-        except (DatabaseError, FeatureNotImplementedError, ValueError) as err:
-            flash(getattr(err, "message", str(err)), "warning")
+        except (DatabaseError, ValueError) as err:
+            flash(getattr(err, "message", str(err)), "danger")
 
     rows = []
+    admins = []
     try:
         rows = service.list_shippers(**filters)
-    except (DatabaseError, FeatureNotImplementedError) as err:
-        flash(getattr(err, "message", str(err)), "info")
+    except DatabaseError as err:
+        flash(err.message, "info")
+    try:
+        admins = service.list_admins()
+    except DatabaseError as err:
+        flash(err.message, "info")
 
     return render_template(
         "shippers/list.html",
         rows=rows,
+        admins=admins,
         filters=filters,
+        form_data=form_data,
         sort_options=service.SORT_OPTIONS,
-        implementation_ready=False,
     )
 
 
 @bp.post("/shippers/<int:user_id>/update")
 def update(user_id: int):
-    """Handle an inline UPDATE action from the shipper list.
-
-    TODO: call service.update_shipper(user_id, request.form), catch validation
-    and DB errors, flash a precise message, then redirect to the filtered list.
-    The stored procedure, not this route, must perform the UPDATE.
-    """
     try:
         service.update_shipper(user_id, request.form)
-        flash("Đã cập nhật Shipper.", "success")
-    except (DatabaseError, FeatureNotImplementedError, ValueError) as err:
-        flash(getattr(err, "message", str(err)), "warning")
-    return redirect(url_for("shippers.index"))
+        flash(f"Shipper {user_id} was updated successfully.", "success")
+    except (DatabaseError, ValueError) as err:
+        flash(getattr(err, "message", str(err)), "danger")
+    return redirect(_list_url())
 
 
 @bp.post("/shippers/<int:user_id>/delete")
 def delete(user_id: int):
-    """Handle a DELETE action from the list.
-
-    TODO: call service.delete_shipper(user_id), display the procedure's result,
-    and distinguish physical deletion from deactivation if that is your chosen
-    SQL policy. Never delete the row directly in this route.
-    """
     try:
-        result = service.delete_shipper(user_id)
-        flash(f"Kết quả xóa Shipper: {result}", "success")
-    except (DatabaseError, FeatureNotImplementedError, ValueError) as err:
-        flash(getattr(err, "message", str(err)), "warning")
-    return redirect(url_for("shippers.index"))
+        action = service.delete_shipper(user_id)
+        if action == "deleted":
+            flash(f"Shipper {user_id} was permanently deleted because no history was found.", "success")
+        else:
+            flash(f"Shipper {user_id} was deactivated. Historical records were preserved.", "success")
+    except (DatabaseError, ValueError) as err:
+        flash(getattr(err, "message", str(err)), "danger")
+    return redirect(_list_url())

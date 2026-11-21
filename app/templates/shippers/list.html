@@ -1,152 +1,102 @@
 {% extends "base.html" %}
-{% block title %}Quản lý Shipper{% endblock %}
+{% block title %}Shipper Management{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>Quản lý Shipper</h1>
-    <p class="muted">Một màn hình cho INSERT, UPDATE, DELETE và danh sách gọi từ <code>sp_ListShippers</code>.</p>
+    <p class="eyebrow">OPERATIONS</p>
+    <h1>Shipper Management</h1>
   </div>
-  <span class="badge">A2 · 3.1 + 3.2</span>
-</div>
-
-<div class="alert alert-info">
-  Danh sách, tìm kiếm, lọc và sắp xếp gọi <code>sp_ListShippers</code>. Thêm / Sửa / Xóa gọi
-  <code>sp_InsertShipper</code>, <code>sp_UpdateShipper</code>, <code>sp_DeleteShipper</code>
-  qua <code>services/shipper_service.py</code>.
 </div>
 
 <section class="card" id="add-shipper">
-  <h2>Thêm Shipper</h2>
-  <p class="muted">Nhập UserID đã tồn tại trong USER. Khi hiện thực SQL, xác nhận ID chưa được dùng sai vai trò và thỏa các khóa ngoại.</p>
-  <form method="post" action="{{ url_for('shippers.index') }}" class="grid">
-    <div class="field">
-      <label for="user_id">User ID *</label>
-      <input id="user_id" name="user_id" type="number" min="1" required placeholder="Ví dụ: 21">
-    </div>
-    <div class="field">
-      <label for="national_id">National Identification Number *</label>
-      <input id="national_id" name="national_id" required pattern="[0-9]{9}([0-9]{3})?" placeholder="9 hoặc 12 chữ số">
-    </div>
-    <div class="field">
-      <label for="availability_status">Trạng thái làm việc *</label>
-      <select id="availability_status" name="availability_status" required>
-        <option value="offline">Offline</option>
-        <option value="available">Available</option>
-        <option value="busy">Busy</option>
+  <div class="section-heading">
+    <div><h2>Create a shipper</h2></div>
+  </div>
+  <form method="post" action="{{ url_for('shippers.index') }}" class="form-layout">
+    <div class="form-section-title">Personal information</div>
+    <div class="field"><label for="email">Email address *</label><input id="email" name="email" type="email" maxlength="100" required value="{{ form_data.get('email', '') }}" autocomplete="email"></div>
+    <div class="field"><label for="phone">Phone number *</label><input id="phone" name="phone" type="tel" inputmode="numeric" pattern="0[0-9]{9}" maxlength="10" required value="{{ form_data.get('phone', '') }}" placeholder="10 digits, starts with 0"></div>
+    <div class="field"><label for="password">Initial password *</label><input id="password" name="password" type="password" minlength="8" required autocomplete="new-password"></div>
+    <div class="field"><label for="date_of_birth">Date of birth *</label><input id="date_of_birth" name="date_of_birth" type="date" required value="{{ form_data.get('date_of_birth', '') }}"></div>
+    <div class="field"><label for="gender">Gender *</label><select id="gender" name="gender" required><option value="">Select gender</option><option value="male" {{ 'selected' if form_data.get('gender') == 'male' else '' }}>Male</option><option value="female" {{ 'selected' if form_data.get('gender') == 'female' else '' }}>Female</option></select></div>
+    <div class="field"><label for="first_name">First name *</label><input id="first_name" name="first_name" maxlength="50" required value="{{ form_data.get('first_name', '') }}"></div>
+    <div class="field"><label for="last_name">Last name *</label><input id="last_name" name="last_name" maxlength="50" required value="{{ form_data.get('last_name', '') }}"></div>
+    <div class="field"><label for="national_id">National ID *</label><input id="national_id" name="national_id" inputmode="numeric" pattern="0[0-9]{11}" maxlength="12" required value="{{ form_data.get('national_id', '') }}" placeholder="12 digits, starts with 0"></div>
+    <div class="field"><label for="managed_by_admin_id">Managing administrator *</label>
+      <select id="managed_by_admin_id" name="managed_by_admin_id" required>
+        <option value="">Select an active administrator</option>
+        {% for admin in admins if admin.AccountStatus == 'active' %}<option value="{{ admin.UserID }}" {{ 'selected' if form_data.get('managed_by_admin_id', '')|string == admin.UserID|string else '' }}>{{ admin.FullName }} (#{{ admin.UserID }})</option>{% endfor %}
       </select>
     </div>
-    <div class="field">
-      <label for="join_date">Ngày tham gia *</label>
-      <input id="join_date" name="join_date" type="date" required>
-    </div>
-    <div class="field">
-      <label for="managed_by_admin_id">Admin quản lý (UserID)</label>
-      <input id="managed_by_admin_id" name="managed_by_admin_id" type="number" min="1" placeholder="Có thể để trống">
-    </div>
-    <div class="field actions">
-      <button class="btn btn-primary" type="submit">＋ Thêm Shipper</button>
-    </div>
+
+    <div class="form-section-title">Driving license</div>
+    <div class="field"><label for="license_number">License number *</label><input id="license_number" name="license_number" inputmode="numeric" pattern="[0-9]{9,12}" maxlength="12" required value="{{ form_data.get('license_number', '') }}"></div>
+    <div class="field"><label for="license_type">License class *</label><select id="license_type" name="license_type" required><option value="">Select class</option>{% for value in ['A1','A2','B1','B2','C'] %}<option value="{{ value }}" {{ 'selected' if form_data.get('license_type') == value else '' }}>{{ value }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="license_issue_date">Issue date *</label><input id="license_issue_date" name="license_issue_date" type="date" required value="{{ form_data.get('license_issue_date', '') }}"></div>
+    <div class="field"><label for="license_expiry_date">Expiry date *</label><input id="license_expiry_date" name="license_expiry_date" type="date" required value="{{ form_data.get('license_expiry_date', '') }}"></div>
+
+    <div class="form-section-title">Vehicle information</div>
+    <div class="field"><label for="brand">Brand *</label><input id="brand" name="brand" maxlength="50" required value="{{ form_data.get('brand', '') }}"></div>
+    <div class="field"><label for="model">Model *</label><input id="model" name="model" maxlength="50" required value="{{ form_data.get('model', '') }}"></div>
+    <div class="field"><label for="license_plate">License plate *</label><input id="license_plate" name="license_plate" maxlength="15" required value="{{ form_data.get('license_plate', '') }}" placeholder="e.g. 59X1-234.56"></div>
+    <div class="field"><label for="color">Color *</label><input id="color" name="color" maxlength="30" required value="{{ form_data.get('color', '') }}"></div>
+    <div class="field"><label for="maximum_load">Maximum load (kg) *</label><input id="maximum_load" name="maximum_load" type="number" min="0.01" step="0.01" required value="{{ form_data.get('maximum_load', '') }}"></div>
+    <div class="field"><label for="vehicle_type">Vehicle type *</label><select id="vehicle_type" name="vehicle_type" required><option value="">Select vehicle type</option>{% for value in ['motorbike','car','van','truck'] %}<option value="{{ value }}" {{ 'selected' if form_data.get('vehicle_type') == value else '' }}>{{ value|title }}</option>{% endfor %}</select></div>
+
+    <div class="form-actions full-width"><button class="btn btn-primary" type="submit">Create shipper</button><button class="btn btn-quiet" type="reset">Clear form</button></div>
   </form>
 </section>
 
 <form class="card filters" method="get" action="{{ url_for('shippers.index') }}">
-  <div class="field grow">
-    <label for="search">Tìm kiếm</label>
-    <input id="search" name="search" value="{{ filters.search }}" placeholder="Tên, email, SĐT hoặc mã định danh">
-  </div>
-  <div class="field">
-    <label for="availability">Trạng thái làm việc</label>
-    <select id="availability" name="availability">
-      <option value="">Tất cả</option>
-      {% for value, label in [('available','Available'),('busy','Busy'),('offline','Offline')] %}
-        <option value="{{ value }}" {{ 'selected' if filters.availability == value else '' }}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="field">
-    <label for="account_status">Tài khoản</label>
-    <select id="account_status" name="account_status">
-      <option value="">Tất cả</option>
-      {% for value, label in [('active','Active'),('suspended','Suspended'),('closed','Closed')] %}
-        <option value="{{ value }}" {{ 'selected' if filters.account_status == value else '' }}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="field">
-    <label for="vehicle_type">Loại xe</label>
-    <select id="vehicle_type" name="vehicle_type">
-      <option value="">Tất cả</option>
-      {% for value, label in [('motorbike','Motorbike'),('car','Car'),('van','Van'),('truck','Truck')] %}
-        <option value="{{ value }}" {{ 'selected' if filters.vehicle_type == value else '' }}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="field">
-    <label for="sort">Sắp xếp</label>
-    <select id="sort" name="sort">
-      {% for key, label in sort_options.items() %}
-        <option value="{{ key }}" {{ 'selected' if filters.sort == key else '' }}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="field actions">
-    <button class="btn btn-primary" type="submit">Tìm / Lọc</button>
-    <a class="btn" href="{{ url_for('shippers.index') }}">Xóa lọc</a>
-  </div>
+  <div class="field grow"><label for="search">Search</label><input id="search" name="search" maxlength="100" value="{{ filters.search }}" placeholder="Name, email, phone, or national ID"></div>
+  <div class="field"><label for="availability">Availability</label><select id="availability" name="availability"><option value="">All statuses</option>{% for value in ['available','busy','offline'] %}<option value="{{ value }}" {{ 'selected' if filters.availability == value else '' }}>{{ value|title }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="account_status">Account status</label><select id="account_status" name="account_status"><option value="">All accounts</option>{% for value in ['active','suspended','closed'] %}<option value="{{ value }}" {{ 'selected' if filters.account_status == value else '' }}>{{ value|title }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="vehicle_type_filter">Vehicle type</label><select id="vehicle_type_filter" name="vehicle_type"><option value="">All vehicles</option>{% for value in ['motorbike','car','van','truck'] %}<option value="{{ value }}" {{ 'selected' if filters.vehicle_type == value else '' }}>{{ value|title }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="sort">Sort by</label><select id="sort" name="sort">{% for key, label in sort_options.items() %}<option value="{{ key }}" {{ 'selected' if filters.sort == key else '' }}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="field actions"><button class="btn btn-primary" type="submit">Apply filters</button><a class="btn btn-secondary" href="{{ url_for('shippers.index') }}">Reset</a></div>
 </form>
 
-<section class="card table-wrap">
-  <div class="page-head">
-    <div>
-      <h2>Danh sách Shipper</h2>
-      <p class="muted">{{ rows|length }} bản ghi · dữ liệu từ <code>sp_ListShippers</code> (JOIN SHIPPER, USER, VEHICLE).</p>
-    </div>
-    <a class="btn btn-primary" href="#add-shipper">＋ Thêm mới</a>
+<section class="card table-card">
+  <div class="section-heading">
+    <div><p class="eyebrow">DIRECTORY</p><h2>Shippers</h2></div>
+    <a class="btn btn-secondary" href="#add-shipper">＋ New shipper</a>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th>User ID</th><th>Họ tên</th><th>Liên hệ</th><th>Mã định danh</th>
-        <th>Làm việc</th><th>Tài khoản</th><th>Loại xe</th><th>Đánh giá</th><th>Thao tác</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for row in rows %}
-      <tr>
-        <td>#{{ row.UserID }}</td>
-        <td>{{ row.FullName or '—' }}</td>
-        <td>{{ row.Email or '—' }}<br><small>{{ row.PhoneNumber or '—' }}</small></td>
-        <td>{{ row.NationalIdentificationNumber or '—' }}</td>
-        <td><span class="badge badge-{{ row.AvailabilityStatus or 'offline' }}">{{ row.AvailabilityStatus or '—' }}</span></td>
-        <td><span class="badge badge-{{ row.AccountStatus or 'closed' }}">{{ row.AccountStatus or '—' }}</span></td>
-        <td>{{ row.VehicleType or '—' }}</td>
-        <td>{{ row.AverageRating if row.AverageRating is not none else '—' }}</td>
-        <td class="nowrap">
-          <details>
-            <summary class="btn btn-sm">Sửa ngay</summary>
-            <form method="post" action="{{ url_for('shippers.update', user_id=row.UserID) }}" class="inline-edit">
-              <div class="field"><label>National ID</label><input name="national_id" required value="{{ row.NationalIdentificationNumber or '' }}"></div>
-              <div class="field"><label>Trạng thái</label>
-                <select name="availability_status">
-                  {% for value in ['available','busy','offline'] %}<option value="{{ value }}" {{ 'selected' if row.AvailabilityStatus == value else '' }}>{{ value }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="field"><label>Ngày tham gia</label><input type="date" name="join_date" value="{{ row.JoinDate or '' }}" required></div>
-              <div class="field"><label>Admin UserID</label><input type="number" min="1" name="managed_by_admin_id" value="{{ row.ManagedByAdminID or '' }}"></div>
-              <button class="btn btn-primary btn-sm" type="submit">Lưu</button>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>User ID</th><th>Shipper</th><th>Contact</th><th>National ID</th><th>Availability</th><th>Account</th><th>Vehicle</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td class="muted nowrap">#{{ row.UserID }}</td>
+          <td><strong>{{ row.FullName or '—' }}</strong><div class="muted small">Joined {{ row.JoinDate|date_only or '—' }}</div></td>
+          <td>{{ row.Email or '—' }}<div class="muted small">{{ row.PhoneNumber or '—' }}</div></td>
+          <td class="nowrap">{{ row.NationalIdentificationNumber or '—' }}</td>
+          <td><span class="badge badge-{{ row.AvailabilityStatus or 'offline' }}">{{ row.AvailabilityStatus or '—' }}</span></td>
+          <td><span class="badge badge-{{ row.AccountStatus or 'closed' }}">{{ row.AccountStatus or '—' }}</span></td>
+          <td>{{ row.VehicleType|title if row.VehicleType else '—' }}<div class="muted small">{{ row.LicensePlate or '' }}</div></td>
+          <td class="actions-cell nowrap">
+            <details>
+              <summary class="btn btn-sm btn-secondary">Edit</summary>
+              <form method="post" action="{{ url_for('shippers.update', user_id=row.UserID) }}" class="inline-edit">
+                {% for key, value in filters.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+                <div class="field"><label>National ID</label><input name="national_id" inputmode="numeric" pattern="0[0-9]{11}" maxlength="12" required value="{{ row.NationalIdentificationNumber or '' }}"></div>
+                <div class="field"><label>Availability</label><select name="availability_status">{% for value in ['available','busy','offline'] %}<option value="{{ value }}" {{ 'selected' if row.AvailabilityStatus == value else '' }}>{{ value|title }}</option>{% endfor %}</select></div>
+                <div class="field"><label>Join date</label><input type="date" name="join_date" value="{{ row.JoinDate|date_only }}" required></div>
+                <div class="field"><label>Managing administrator</label><select name="managed_by_admin_id" required>{% for admin in admins %}<option value="{{ admin.UserID }}" {{ 'selected' if row.ManagedByAdminID == admin.UserID else '' }}>{{ admin.FullName }} (#{{ admin.UserID }}){% if admin.AccountStatus != 'active' %} — Inactive{% endif %}</option>{% endfor %}</select></div>
+                <button class="btn btn-primary btn-sm" type="submit">Save changes</button>
+              </form>
+            </details>
+            <form method="post" action="{{ url_for('shippers.delete', user_id=row.UserID) }}" class="inline" onsubmit="return confirm('Delete this shipper? Profiles with business history will be deactivated to preserve records.');">
+              {% for key, value in filters.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+              <button class="btn btn-danger btn-sm" type="submit">Delete</button>
             </form>
-          </details>
-          <form method="post" action="{{ url_for('shippers.delete', user_id=row.UserID) }}" class="inline" onsubmit="return confirm('Xác nhận xóa/ngừng hoạt động Shipper này?');">
-            <button class="btn btn-danger btn-sm" type="submit">Xóa</button>
-          </form>
-        </td>
-      </tr>
-    {% else %}
-      <tr><td colspan="9" class="empty">
-        Không có shipper nào khớp với bộ lọc hiện tại.
-      </td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="empty">No shippers match the current filters.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
 {% endblock %}

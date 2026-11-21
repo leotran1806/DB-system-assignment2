@@ -1,17 +1,14 @@
 -- ============================================================================
--- 01_create_tables.sql | A2 - Section 1.1 (2 points)
+-- 01_create_tables.sql | Complete schema for Database Assignment 2
 -- DBMS: MySQL 8.0.16+
---
--- STARTER FILE: this file intentionally contains TODO instructions, not the
--- completed CREATE TABLE implementation. Fill every table below before running
--- 02_sample_data.sql or connecting the application to the database.
---
--- Important: unlike the original project script, this starter does NOT DROP
--- an existing database. It is safe to run repeatedly before you add your DDL.
+-- Creates the parcel_delivery database and all 16 relational tables.
+-- Run against a fresh schema; this is not an in-place migration script.
 -- ============================================================================
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE DATABASE IF NOT EXISTS parcel_delivery
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER DATABASE parcel_delivery CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE parcel_delivery;
 
 -- ---------------------------------------------------------------------------
@@ -30,7 +27,6 @@ USE parcel_delivery;
 -- ---------------------------------------------------------------------------
 
 -- 1) USER
--- TODO: CREATE TABLE `USER`.
 -- Required attributes from A1:
 --   UserID (PK, auto number), Email, PhoneNumber, PasswordHash, AccountStatus,
 --   CreatedDate, DateOfBirth, Gender, FirstName, LastName.
@@ -66,11 +62,10 @@ CREATE TABLE `USER` (
     CONSTRAINT chk_user_firstname CHECK (TRIM(FirstName) <> ''),
     CONSTRAINT chk_user_lastname CHECK (TRIM(LastName) <> ''),
     CONSTRAINT chk_user_dob CHECK (DateOfBirth < CreatedDate)
-) ENGINE = InnoDB;
+) ENGINE = InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
  
 
 -- 2) ADMIN
--- TODO: CREATE TABLE ADMIN.
 -- Required attributes: UserID (PK and FK -> USER), EmployeeCode (UNIQUE),
 -- Department, AccessLevel, HireDate, Supervisor_ID (self-referencing FK -> ADMIN).
 -- Constraints: AccessLevel 1..3; an admin cannot supervise themself.
@@ -96,7 +91,6 @@ CREATE TABLE ADMIN (
 ) ENGINE = InnoDB;
 
 -- 3) CUSTOMER
--- TODO: CREATE TABLE CUSTOMER.
 -- Required attributes: UserID (PK and FK -> USER), LoyaltyPoint.
 -- Constraint: LoyaltyPoint >= 0.
 -- 3) CUSTOMER
@@ -111,7 +105,6 @@ CREATE TABLE CUSTOMER (
  
 
 -- 4) SHIPPER
--- TODO: CREATE TABLE SHIPPER.
 -- Required attributes: UserID (PK and FK -> USER),
 -- NationalIdentificationNumber (UNIQUE), AvailabilityStatus, JoinDate,
 -- ManagedByAdminID (nullable FK -> ADMIN).
@@ -142,7 +135,6 @@ CREATE TABLE SHIPPER (
 ) ENGINE = InnoDB;
 
 -- 5) SHIPPER_LICENSE
--- TODO: CREATE TABLE SHIPPER_LICENSE.
 -- Required attributes: ShipperID (FK -> SHIPPER), LicenseNumber, LicenseType.
 -- Use a composite PK appropriate to A1 (ShipperID + LicenseNumber).
 -- LicenseType values in the team's A1 model: A1 / A2 / B1 / B2 / C.
@@ -166,7 +158,6 @@ CREATE TABLE SHIPPER_LICENSE (
 ) ENGINE = InnoDB;
 
 -- 6) VEHICLE
--- TODO: CREATE TABLE VEHICLE.
 -- Required attributes: VehicleID (PK), ShipperID (FK -> SHIPPER), Brand, Model,
 -- LicensePlate, Color, MaximumLoad, VehicleType.
 -- A1 relationship: one vehicle per shipper; make ShipperID UNIQUE.
@@ -184,6 +175,7 @@ CREATE TABLE VEHICLE (
     VehicleType  VARCHAR(20)   NOT NULL,
     CONSTRAINT pk_vehicle PRIMARY KEY (VehicleID),
     CONSTRAINT uq_vehicle_shipper UNIQUE (ShipperID),
+    CONSTRAINT uq_vehicle_id_shipper UNIQUE (VehicleID, ShipperID),
     CONSTRAINT uq_vehicle_plate UNIQUE (LicensePlate),
     CONSTRAINT fk_vehicle_shipper FOREIGN KEY (ShipperID)
         REFERENCES SHIPPER (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -232,21 +224,57 @@ CREATE TABLE DELIVERY_ORDER (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 8) PACKAGE
--- TODO: CREATE TABLE `PACKAGE`.
--- Required attributes: PackageID (PK), OrderID (FK -> DELIVERY_ORDER),
--- PackageDescription, PackageCategory, Weight, Length, Width, Height,
--- DeclaredValue, IsFragile.
--- Constraints: dimensions/weight/declared value must not be negative; A1 says
--- every order contains at least one package (cross-row rule, not simple CHECK).
+-- One delivery order can contain one or more packages.
+CREATE TABLE `PACKAGE` (
+    PackageID          INT           NOT NULL AUTO_INCREMENT,
+    OrderID            INT           NOT NULL,
+    PackageDescription VARCHAR(255)  NOT NULL,
+    PackageCategory    VARCHAR(50)   NOT NULL,
+    Weight             DECIMAL(8,2)  NOT NULL,
+    Length             DECIMAL(8,2)  NOT NULL,
+    Width              DECIMAL(8,2)  NOT NULL,
+    Height             DECIMAL(8,2)  NOT NULL,
+    DeclaredValue      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    IsFragile          BOOLEAN       NOT NULL DEFAULT FALSE,
+    CONSTRAINT pk_package PRIMARY KEY (PackageID),
+    CONSTRAINT fk_package_order FOREIGN KEY (OrderID)
+        REFERENCES DELIVERY_ORDER (OrderID) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT chk_package_description CHECK (TRIM(PackageDescription) <> ''),
+    CONSTRAINT chk_package_category CHECK (TRIM(PackageCategory) <> ''),
+    CONSTRAINT chk_package_weight CHECK (Weight > 0),
+    CONSTRAINT chk_package_dimensions CHECK (Length > 0 AND Width > 0 AND Height > 0),
+    CONSTRAINT chk_package_declared_value CHECK (DeclaredValue >= 0),
+    INDEX idx_package_order (OrderID)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- 9) DELIVERY_ASSIGNMENT (weak entity)
--- TODO: CREATE TABLE DELIVERY_ASSIGNMENT.
--- Required attributes: OrderID, AssignmentNo, ShipperID, VehicleID, AssignedDate,
--- AcceptedDate, CompleteDate, AssignmentStatus, RejectionReason.
--- Use composite PK (OrderID, AssignmentNo), with FKs to DELIVERY_ORDER,
--- SHIPPER and VEHICLE. Consider date-order CHECK constraints:
---   AcceptedDate >= AssignedDate; CompleteDate >= AcceptedDate.
--- AssignmentStatus values must follow A1.
+-- AssignmentStatus is kept as VARCHAR so the team's A1 vocabulary can be
+-- preserved without imposing an unverified enum on the existing data model.
+CREATE TABLE DELIVERY_ASSIGNMENT (
+    OrderID          INT          NOT NULL,
+    AssignmentNo     INT          NOT NULL,
+    ShipperID        INT          NOT NULL,
+    VehicleID        INT          NOT NULL,
+    AssignedDate     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    AcceptedDate     DATETIME     NULL,
+    CompleteDate     DATETIME     NULL,
+    AssignmentStatus VARCHAR(20)  NOT NULL,
+    RejectionReason  VARCHAR(500) NULL,
+    CONSTRAINT pk_delivery_assignment PRIMARY KEY (OrderID, AssignmentNo),
+    CONSTRAINT fk_assignment_order FOREIGN KEY (OrderID)
+        REFERENCES DELIVERY_ORDER (OrderID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_assignment_shipper FOREIGN KEY (ShipperID)
+        REFERENCES SHIPPER (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_assignment_vehicle_shipper FOREIGN KEY (VehicleID, ShipperID)
+        REFERENCES VEHICLE (VehicleID, ShipperID) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT chk_assignment_no CHECK (AssignmentNo > 0),
+    CONSTRAINT chk_assignment_accepted_date
+        CHECK (AcceptedDate IS NULL OR AcceptedDate >= AssignedDate),
+    CONSTRAINT chk_assignment_complete_date
+        CHECK (CompleteDate IS NULL OR (AcceptedDate IS NOT NULL AND CompleteDate >= AcceptedDate)),
+    INDEX idx_assignment_shipper_status (ShipperID, AssignmentStatus),
+    INDEX idx_assignment_vehicle (VehicleID)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- 10) ORDER_STATUS_LOG — Duy
 CREATE TABLE ORDER_STATUS_LOG (

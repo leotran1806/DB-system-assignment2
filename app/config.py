@@ -1,7 +1,4 @@
-"""Application configuration.
-
-This module only reads configuration. It does not connect to MySQL.
-"""
+"""Environment-based application and database configuration."""
 from __future__ import annotations
 
 import os
@@ -21,7 +18,6 @@ DB_CONFIG = {
     "charset": "utf8mb4",
     "collation": "utf8mb4_unicode_ci",
 }
-
-SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "local-development-key-change-me")
-DEBUG = os.getenv("FLASK_DEBUG", "true").strip().lower() in {"1", "true", "yes", "on"}
+SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "change-this-development-key-before-deployment")
+DEBUG = os.getenv("FLASK_DEBUG", "false").strip().lower() in {"1", "true", "yes", "on"}
 PORT = int(os.getenv("PORT", "5000"))

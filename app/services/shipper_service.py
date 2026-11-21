@@ -1,20 +1,13 @@
-"""Service layer for the SHIPPER management screen.
-
-Chosen CRUD target for A2 section 2.1: SHIPPER.
-The list procedure may JOIN USER and VEHICLE to display human-readable data,
-but the three CRUD procedures should be designed around the selected SHIPPER
-record. If the team's physical mapping requires a parent USER row or dependent
-records, document that explicitly in the report and preserve all foreign keys.
-"""
+"""Application service methods for shipper management."""
 from __future__ import annotations
 
+import re
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from db import DatabaseError, FeatureNotImplementedError, call_proc, query_all
+from db import DatabaseError, call_proc, query_all
 
-
-# Keep the sort keys in a whitelist. Never interpolate an arbitrary request
-# parameter directly into an SQL ORDER BY clause.
 SORT_OPTIONS = {
     "name": "Tên tài xế (A-Z)",
     "join_date": "Ngày tham gia (mới nhất)",
@@ -22,23 +15,56 @@ SORT_OPTIONS = {
     "rating": "Điểm đánh giá",
 }
 
-# Allowed values (mirror the CHECK constraints in database/01_create_tables.sql).
 AVAILABILITY_VALUES = ("available", "busy", "offline")
 ACCOUNT_STATUS_VALUES = ("active", "suspended", "closed")
 VEHICLE_TYPE_VALUES = ("motorbike", "car", "van", "truck")
-SEARCH_MAX_LENGTH = 100  # sp_ListShippers.p_Search is VARCHAR(100)
+LICENSE_TYPE_VALUES = ("A1", "A2", "B1", "B2", "C")
+SEARCH_MAX_LENGTH = 100
 
 
 def _clean_text(value: Any) -> str | None:
-    """Normalize optional text from form/query input.
-
-    This small utility is already implemented because it is generic plumbing.
-    Add field-specific validation in insert_shipper/update_shipper.
-    """
     if value is None:
         return None
-    normalized = str(value).strip()
-    return normalized or None
+    value = str(value).strip()
+    return value or None
+
+
+def _required(form, key: str, label: str) -> str:
+    value = _clean_text(form.get(key))
+    if value is None:
+        raise DatabaseError(f"{label} is required.")
+    return value
+
+
+def _positive_int(value: Any, label: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise DatabaseError(f"{label} must be a positive integer.") from None
+    if parsed <= 0:
+        raise DatabaseError(f"{label} must be a positive integer.")
+    return parsed
+
+
+def _date_value(value: Any, label: str) -> date:
+    text = _clean_text(value)
+    if not text:
+        raise DatabaseError(f"{label} is required.")
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        raise DatabaseError(f"{label} must be a valid date.") from None
+
+
+def _decimal_value(value: Any, label: str) -> Decimal:
+    text = _clean_text(value)
+    try:
+        number = Decimal(text) if text is not None else Decimal("NaN")
+    except InvalidOperation:
+        number = Decimal("NaN")
+    if not number.is_finite() or number <= 0:
+        raise DatabaseError(f"{label} must be a number greater than zero.")
+    return number
 
 
 def _validate_choice(value: Any, allowed: tuple[str, ...], label: str) -> str | None:
@@ -58,22 +84,6 @@ def list_shippers(
     vehicle_type: str | None = None,
     sort: str = "name",
 ) -> list[dict[str, Any]]:
-    """Return rows by calling the first query procedure from A2 section 2.3.
-
-    IMPLEMENT THIS FUNCTION:
-    1. Normalize the search/filter parameters using _clean_text().
-    2. Validate availability, account_status, vehicle_type and sort against
-       the allowed values from A1. Reject unsupported values with a clear error.
-    3. Call `sp_ListShippers` using db.call_proc(...). The procedure itself must
-       JOIN at least two tables, apply WHERE filters and ORDER BY.
-    4. Pass every filter used by the SQL WHERE/ORDER BY as an input parameter.
-    5. Return the list of dictionaries. Do not silently sort incorrectly in
-       Python if the assignment expects ORDER BY inside the stored procedure.
-    6. Keep the output column aliases consistent with shippers/list.html:
-       UserID, FullName, Email, PhoneNumber, NationalIdentificationNumber,
-       AvailabilityStatus, AccountStatus, VehicleType, LicensePlate, JoinDate,
-       AverageRating, ManagedByAdminID.
-    """
     search = _clean_text(search)
     if search is not None and len(search) > SEARCH_MAX_LENGTH:
         raise DatabaseError(
@@ -102,84 +112,68 @@ def list_shippers(
     )
 
 
-def insert_shipper(form) -> None:
-    """Insert one SHIPPER record through `sp_InsertShipper` (A2 section 2.1).
+def insert_shipper(form) -> int | None:
+    """Create USER, SHIPPER, SHIPPER_LICENSE and VEHICLE in one SQL transaction."""
+    email = _required(form, "email", "Email")
+    phone = _required(form, "phone", "Phone number")
+    password = _required(form, "password", "Password")
+    date_of_birth = _date_value(form.get("date_of_birth"), "Date of birth")
+    gender = _validate_choice(form.get("gender"), ("male", "female"), "gender")
+    first_name = _required(form, "first_name", "First name")
+    last_name = _required(form, "last_name", "Last name")
+    national_id = _required(form, "national_id", "National ID")
+    admin_id = _positive_int(form.get("managed_by_admin_id"), "Managing administrator ID")
+    license_number = _required(form, "license_number", "License number")
+    license_type = _validate_choice(form.get("license_type"), LICENSE_TYPE_VALUES, "license type")
+    license_issue_date = _date_value(form.get("license_issue_date"), "License issue date")
+    license_expiry_date = _date_value(form.get("license_expiry_date"), "License expiry date")
+    brand = _required(form, "brand", "Vehicle brand")
+    model = _required(form, "model", "Vehicle model")
+    license_plate = _required(form, "license_plate", "License plate").upper()
+    color = _required(form, "color", "Vehicle color")
+    maximum_load = _decimal_value(form.get("maximum_load"), "Maximum load")
+    vehicle_type = _validate_choice(form.get("vehicle_type"), VEHICLE_TYPE_VALUES, "vehicle type")
 
-    IMPLEMENT THIS FUNCTION:
-    1. Read UserID, NationalIdentificationNumber, AvailabilityStatus,
-       JoinDate and ManagedByAdminID from the submitted form.
-    2. Convert empty optional values to None; parse numeric IDs as integers.
-    3. Validate required values before calling MySQL. Examples:
-       - UserID must be a positive integer and must reference an existing USER.
-       - NationalIdentificationNumber must contain 9 or 12 digits and be unique.
-       - AvailabilityStatus must be one of available/busy/offline.
-       - JoinDate must be a valid date and must not be in the future (if your
-         team adopts that business rule).
-       - ManagedByAdminID, when supplied, must reference an existing ADMIN.
-    4. Call `sp_InsertShipper` with db.call_proc(). Do not execute INSERT here.
-    5. The SQL procedure must repeat database-side validation and return a
-       meaningful SIGNAL message for every rejected condition.
-    6. Return the generated/created UserID if the procedure returns it.
-    """
-    raise FeatureNotImplementedError(
-        "Chức năng thêm Shipper chưa được cài đặt. Hãy hoàn thiện "
-        "insert_shipper() và sp_InsertShipper."
-    )
+    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+        raise DatabaseError("Enter a valid email address.")
+    if not re.fullmatch(r"0\d{9}", phone):
+        raise DatabaseError("Phone number must contain 10 digits and start with 0.")
+    if len(password) < 8:
+        raise DatabaseError("Password must contain at least 8 characters.")
+    if gender is None or license_type is None or vehicle_type is None:
+        raise DatabaseError("Please complete all required selection fields.")
+    if license_issue_date >= license_expiry_date:
+        raise DatabaseError("License expiry date must be after the issue date.")
+
+    rows = call_proc("sp_InsertShipper", (
+        email, phone, password, date_of_birth, gender, first_name, last_name,
+        national_id, admin_id, license_number, license_type,
+        license_issue_date, license_expiry_date, brand, model, license_plate,
+        color, maximum_load, vehicle_type,
+    ))
+    if not rows:
+        return None
+    return rows[0].get("NewShipperID") or rows[0].get("NewUserID")
 
 
 def update_shipper(user_id: int, form) -> None:
-    """Update a SHIPPER record through `sp_UpdateShipper` (A2 section 2.1).
-
-    IMPLEMENT THIS FUNCTION:
-    1. Validate user_id as a positive integer and confirm the SHIPPER exists.
-    2. Normalize and validate NationalIdentificationNumber, AvailabilityStatus,
-       JoinDate and ManagedByAdminID using the same rules as insert_shipper().
-    3. For unique NIN, exclude the current UserID when checking duplicates.
-    4. Call `sp_UpdateShipper` with db.call_proc(); pass values as parameters.
-    5. Do not write UPDATE SQL in Python. The stored procedure must own the
-       UPDATE and return specific SQLSTATE 45000 messages on validation errors.
-    6. If no row was changed, report that the shipper was not found or unchanged.
-    """
-    raise FeatureNotImplementedError(
-        "Chức năng cập nhật Shipper chưa được cài đặt. Hãy hoàn thiện "
-        "update_shipper() và sp_UpdateShipper."
-    )
+    shipper_id = _positive_int(user_id, "Shipper ID")
+    national_id = _required(form, "national_id", "National ID")
+    availability = _validate_choice(form.get("availability_status"), AVAILABILITY_VALUES, "availability status")
+    join_date = _date_value(form.get("join_date"), "Join date")
+    admin_id = _positive_int(form.get("managed_by_admin_id"), "Managing administrator ID")
+    if availability is None:
+        raise DatabaseError("Availability status is required.")
+    call_proc("sp_UpdateShipper", (shipper_id, national_id, availability, join_date, admin_id))
 
 
 def delete_shipper(user_id: int) -> str:
-    """Delete/deactivate a SHIPPER through `sp_DeleteShipper` (A2 section 2.1).
-
-    IMPLEMENT THIS FUNCTION:
-    1. Validate user_id and confirm the target SHIPPER exists.
-    2. Call `sp_DeleteShipper` through db.call_proc(); never issue DELETE from
-       this Python function.
-    3. Read and return the procedure's action/message so the route can explain
-       the result to the user.
-    4. In the SQL procedure, define the policy explicitly. Suggested policy:
-       - Physical deletion is allowed only for a test/erroneous shipper record
-         with no assignment, earning, feedback or other historical references.
-       - If historical records exist, do not physically delete them; either
-         reject with a specific message or set the account to closed and the
-         availability to offline while preserving history. Choose one policy
-         and explain its purpose in the report.
-    5. Use a transaction if the procedure touches dependent rows; rollback on
-       any error. Preserve referential integrity and assignment history.
-    """
-    raise FeatureNotImplementedError(
-        "Chức năng xóa Shipper chưa được cài đặt. Hãy hoàn thiện "
-        "delete_shipper() và sp_DeleteShipper."
-    )
+    shipper_id = _positive_int(user_id, "Shipper ID")
+    rows = call_proc("sp_DeleteShipper", (shipper_id,))
+    return str(rows[0].get("Action", "deactivated")) if rows else "deactivated"
 
 
 def get_shipper(user_id: int) -> dict[str, Any] | None:
-    """Get one row for an inline edit form.
-
-    IMPLEMENT THIS FUNCTION:
-    1. Validate user_id.
-    2. Prefer calling `sp_ListShippers` with a UserID filter, or add a dedicated
-       read-only procedure if the list procedure is not suitable.
-    3. Return one dictionary or None. Keep aliases consistent with the template.
-    """
     try:
         shipper_id = int(user_id)
     except (TypeError, ValueError):
@@ -192,20 +186,12 @@ def get_shipper(user_id: int) -> dict[str, Any] | None:
     )
     return rows[0] if rows else None
 
-
+# Chỗ này Minh lại hàm list_admins() của em nó không hiển thị gì hết (cái code anh để đây mới hiện á)
 def list_admins() -> list[dict[str, Any]]:
-    """Return admin choices for the 'managed by' dropdown.
-
-    IMPLEMENT THIS FUNCTION with a SELECT-only query via db.query_all():
-    1. JOIN ADMIN with USER to retrieve UserID and a display name.
-    2. ORDER BY the display name.
-    3. Return dictionaries with UserID and FullName keys.
-    This is lookup/read-only data; do not create another write procedure for it.
-    """
     return query_all(
         "SELECT a.UserID AS UserID, "
-        "       CONCAT_WS(' ', u.LastName, u.FirstName) AS FullName "
-        "  FROM ADMIN a "
-        "  JOIN `USER` u ON u.UserID = a.UserID "
-        " ORDER BY u.FirstName, u.LastName, a.UserID"
+        "       CONCAT_WS(' ', u.LastName, u.FirstName) AS FullName, "
+        "       u.AccountStatus AS AccountStatus "
+        "FROM ADMIN a JOIN `USER` u ON u.UserID = a.UserID "
+        "ORDER BY u.AccountStatus, u.LastName, u.FirstName, a.UserID"
     )

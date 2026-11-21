@@ -1,18 +1,19 @@
 <!doctype html>
-<html lang="vi">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Parcel Delivery{% endblock %} · Assignment 2</title>
+  <meta name="theme-color" content="#f4f6fb">
+  <title>{% block title %}Parcel Delivery{% endblock %} · Admin Console</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <header class="topbar">
     <div class="container topbar-inner">
-      <a class="brand" href="{{ url_for('shippers.index') }}">📦 Parcel Delivery <span>Admin · A2 Starter</span></a>
-      <nav>
-        <a href="{{ url_for('shippers.index') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('shippers.') else '' }}">Quản lý Shipper</a>
-        <a href="{{ url_for('reports.index') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('reports.') else '' }}">Procedure &amp; Function</a>
+      <a class="brand" href="{{ url_for('shippers.index') }}"><span class="brand-icon">P</span> Parcel Delivery <span class="brand-subtitle">ADMIN CONSOLE</span></a>
+      <nav aria-label="Main navigation">
+        <a href="{{ url_for('shippers.index') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('shippers.') else '' }}">Shippers</a>
+        <a href="{{ url_for('reports.index') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('reports.') else '' }}">Reports</a>
       </nav>
     </div>
   </header>
@@ -26,6 +27,6 @@
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="container footer">Assignment 2 · On-demand Parcel Delivery System · Flask + MySQL</footer>
+  <footer class="container footer">On-demand Parcel Delivery System · Database Assignment 2</footer>
 </body>
 </html>

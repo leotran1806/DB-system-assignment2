@@ -1,136 +1,15 @@
 -- ============================================================================
--- 05_functions.sql | A2 - Section 2.4 (1 point)
--- STARTER FILE: implement two MySQL stored functions.
--- Both functions must use input parameters, input validation, queries, cursors,
--- and IF and/or LOOP statements. Demo them using SELECT function_name(...).
+-- 05_functions.sql | Stored functions for shipper metrics
+-- MySQL 8.0.16+
 -- ============================================================================
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE parcel_delivery;
 
--- TODO function 1: fn_ShipperReputation(p_ShipperID INT)
--- Suggested return type: DECIMAL(3,2).
--- Required implementation steps:
--- 1. Validate p_ShipperID is not NULL and is a positive integer.
--- 2. Query SHIPPER to confirm the ID exists; SIGNAL a meaningful message if not.
--- 3. Declare a cursor selecting Rating from FEEDBACK for this ShipperID where
---    FeedbackType='customer'. Do NOT include feedback written by the shipper.
--- 4. Declare a NOT FOUND handler to stop cursor iteration.
--- 5. OPEN the cursor; FETCH ratings inside a LOOP; use IF to exit when done;
---    accumulate rating total and count.
--- 6. CLOSE the cursor. Return 0.00 when there are no ratings, otherwise return
---    the rounded average.
--- 7. Add a test SELECT calling this function for a shipper with and without ratings.
-
--- TODO function 2: fn_ShipperBonus(p_ShipperID INT, p_FromDate DATE, p_ToDate DATE)
--- Suggested return type: DECIMAL(12,2).
--- Required implementation steps:
--- 1. Validate positive ShipperID; both dates are present; FromDate <= ToDate.
--- 2. Query SHIPPER to confirm the ID exists.
--- 3. Declare a cursor that selects the shipper's SHIPPER_EARNING rows in the
---    requested period. Select DeliveryFee and PlatformCommission (or a justified
---    NetEarning column if your schema stores it).
--- 4. OPEN cursor; FETCH each earning; accumulate DeliveryFee - Commission.
---    Use LOOP and an IF condition plus a NOT FOUND handler.
--- 5. CLOSE cursor; use IF / ELSEIF / ELSE to select the bonus rate.
--- 6. Thresholds and rates are NOT specified by A1. Agree on values as a team,
---    document the assumption in the report, and use the same values in sample data.
--- 7. Return the calculated bonus and add SELECT tests for lower/middle/upper tiers.
-DELIMITER $$
-CREATE FUNCTION fn_ShipperBonus(shipperID INT, fromDate DATE, toDate DATE)
-RETURNS INT
-DETERMINISTIC
-BEGIN
-    DECLARE done INT DEFAULT 0;
-    DECLARE exist INT DEFAULT 1;
-    DECLARE fee DECIMAL(12,2);
-    DECLARE commission DECIMAL (12,2);
-    DECLARE net DECIMAL(12,2) DEFAULT 0;
-    DECLARE rate DECIMAL(2,1) DEFAULT 0;
-    DECLARE shipperCursor CURSOR FOR
-        SELECT DeliveryFee, PlatformCommission FROM SHIPPER_EARNING
-        WHERE ShipperID = shipperID
-        AND EarningDate >= fromDate
-        AND EarningDate < DATE_ADD(toDate, INTERVAL 1 DAY);
-    DECLARE CONTINUE HANDLER FOR NOT FOUND
-        SET done = 1;
-    
-    IF shipperID IS NULL OR shipperID < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This field cannot be empty';
-    END IF;
-    IF fromDate IS NULL OR toDate IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This field cannot be empty';
-    END IF;
-    IF fromDate > toDate THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'From date cannot be after to date';
-    END IF;
-    
-    SELECT COUNT(*) INTO exist FROM SHIPPER WHERE UserID = shipperID;
-    IF exist = 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot find the corresponding shipper';
-    END IF;
-
-    OPEN shipperCursor;
-    earn_loop: LOOP
-        FETCH shipperCursor INTO fee, commission;
-        IF done = 1 THEN
-            LEAVE earn_loop;
-        END IF;
-        SET net = net + (fee - commission);
-    END LOOP;
-    CLOSE shipperCursor;
-
-    IF net >= POWER(10, 7) THEN
-        SET rate = 0.1;
-    ELSEIF net >= 5 * POWER(10, 6) THEN
-        SET rate = 0.05;
-    ELSE
-        SET rate = 0;
-    END IF;
-    RETURN ROUND(net * rate, 0);
-END$$
-DELIMITER ;
--- Template skeleton (uncomment and complete):
--- DELIMITER $$
--- CREATE FUNCTION fn_ShipperReputation(p_ShipperID INT)
--- RETURNS DECIMAL(3,2)
--- READS SQL DATA
--- BEGIN
---     DECLARE v_done INT DEFAULT 0;
---     DECLARE v_rating INT;
---     DECLARE v_total INT DEFAULT 0;
---     DECLARE v_count INT DEFAULT 0;
---     DECLARE rating_cursor CURSOR FOR
---         SELECT Rating FROM FEEDBACK
---          WHERE ShipperID = p_ShipperID AND FeedbackType = 'customer';
---     DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
---     -- TODO: validate input and existence before OPEN.
---     -- TODO: OPEN cursor; LOOP/FETCH; IF v_done=1 THEN LEAVE; END IF;
---     -- TODO: accumulate; CLOSE cursor; handle zero ratings; RETURN average.
--- END$$
---
--- CREATE FUNCTION fn_ShipperBonus(
---     p_ShipperID INT, p_FromDate DATE, p_ToDate DATE
--- ) RETURNS DECIMAL(12,2)
--- READS SQL DATA
--- BEGIN
---     DECLARE v_done INT DEFAULT 0;
---     DECLARE v_delivery_fee DECIMAL(12,2);
---     DECLARE v_commission DECIMAL(12,2);
---     DECLARE v_total_net DECIMAL(14,2) DEFAULT 0;
---     DECLARE earning_cursor CURSOR FOR
---         SELECT DeliveryFee, PlatformCommission FROM SHIPPER_EARNING
---          WHERE ShipperID=p_ShipperID
---            AND EarningDate >= p_FromDate
---            AND EarningDate < DATE_ADD(p_ToDate, INTERVAL 1 DAY);
---     DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
---     -- TODO: validate parameters and shipper existence.
---     -- TODO: OPEN; LOOP/FETCH; IF done LEAVE; accumulate fee - commission.
---     -- TODO: CLOSE; IF/ELSEIF selects agreed rate; RETURN bonus.
--- END$$
--- DELIMITER ;
-
+DROP FUNCTION IF EXISTS fn_ShipperBonus;
 DROP FUNCTION IF EXISTS fn_ShipperReputation;
 
 DELIMITER $$
+
 CREATE FUNCTION fn_ShipperReputation(p_ShipperID INT)
 RETURNS DECIMAL(3,2)
 READS SQL DATA
@@ -196,4 +75,72 @@ BEGIN
 
     RETURN ROUND(v_sum / v_weights, 2);
 END$$
+
+CREATE FUNCTION fn_ShipperBonus(
+    p_ShipperID INT,
+    p_FromDate DATE,
+    p_ToDate DATE
+)
+RETURNS INT
+NOT DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE v_done INT DEFAULT 0;
+    DECLARE v_exists INT DEFAULT 0;
+    DECLARE v_delivery_fee DECIMAL(15,2) DEFAULT 0;
+    DECLARE v_commission DECIMAL(15,2) DEFAULT 0;
+    DECLARE v_total_net DECIMAL(15,2) DEFAULT 0;
+    DECLARE v_bonus_rate DECIMAL(4,3) DEFAULT 0;
+
+    DECLARE earning_cursor CURSOR FOR
+        SELECT DeliveryFee, PlatformCommission
+        FROM SHIPPER_EARNING
+        WHERE ShipperID = p_ShipperID
+          AND EarningDate >= p_FromDate
+          AND EarningDate < DATE_ADD(p_ToDate, INTERVAL 1 DAY);
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
+
+    IF p_ShipperID IS NULL OR p_ShipperID <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Shipper ID must be a positive integer.';
+    END IF;
+    IF p_FromDate IS NULL OR p_ToDate IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Start date and end date are required.';
+    END IF;
+    IF p_FromDate > p_ToDate THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Start date cannot be after end date.';
+    END IF;
+
+    SELECT COUNT(*) INTO v_exists
+    FROM SHIPPER
+    WHERE UserID = p_ShipperID;
+    IF v_exists = 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Shipper does not exist.';
+    END IF;
+
+    OPEN earning_cursor;
+    earning_loop: LOOP
+        FETCH earning_cursor INTO v_delivery_fee, v_commission;
+        IF v_done = 1 THEN
+            LEAVE earning_loop;
+        END IF;
+        SET v_total_net = v_total_net + (v_delivery_fee - v_commission);
+    END LOOP;
+    CLOSE earning_cursor;
+
+    -- Business policy: 5% from VND 5,000,000 net earnings; 10% from VND 10,000,000.
+    IF v_total_net >= 100000 THEN
+        SET v_bonus_rate = 0.10;
+    ELSEIF v_total_net >= 50000 THEN
+        SET v_bonus_rate = 0.05;
+    ELSE
+        SET v_bonus_rate = 0.00;
+    END IF;
+
+    RETURN ROUND(v_total_net * v_bonus_rate, 0);
+END$$
+
 DELIMITER ;
