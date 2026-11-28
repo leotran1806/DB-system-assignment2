@@ -32,8 +32,6 @@
     <div class="form-section-title">Driving license</div>
     <div class="field"><label for="license_number">License number *</label><input id="license_number" name="license_number" inputmode="numeric" pattern="[0-9]{9,12}" maxlength="12" required value="{{ form_data.get('license_number', '') }}"></div>
     <div class="field"><label for="license_type">License class *</label><select id="license_type" name="license_type" required><option value="">Select class</option>{% for value in ['A1','A2','B1','B2','C'] %}<option value="{{ value }}" {{ 'selected' if form_data.get('license_type') == value else '' }}>{{ value }}</option>{% endfor %}</select></div>
-    <div class="field"><label for="license_issue_date">Issue date *</label><input id="license_issue_date" name="license_issue_date" type="date" required value="{{ form_data.get('license_issue_date', '') }}"></div>
-    <div class="field"><label for="license_expiry_date">Expiry date *</label><input id="license_expiry_date" name="license_expiry_date" type="date" required value="{{ form_data.get('license_expiry_date', '') }}"></div>
 
     <div class="form-section-title">Vehicle information</div>
     <div class="field"><label for="brand">Brand *</label><input id="brand" name="brand" maxlength="50" required value="{{ form_data.get('brand', '') }}"></div>

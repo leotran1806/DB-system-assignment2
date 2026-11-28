@@ -125,8 +125,6 @@ def insert_shipper(form) -> int | None:
     admin_id = _positive_int(form.get("managed_by_admin_id"), "Managing administrator ID")
     license_number = _required(form, "license_number", "License number")
     license_type = _validate_choice(form.get("license_type"), LICENSE_TYPE_VALUES, "license type")
-    license_issue_date = _date_value(form.get("license_issue_date"), "License issue date")
-    license_expiry_date = _date_value(form.get("license_expiry_date"), "License expiry date")
     brand = _required(form, "brand", "Vehicle brand")
     model = _required(form, "model", "Vehicle model")
     license_plate = _required(form, "license_plate", "License plate").upper()
@@ -142,13 +140,10 @@ def insert_shipper(form) -> int | None:
         raise DatabaseError("Password must contain at least 8 characters.")
     if gender is None or license_type is None or vehicle_type is None:
         raise DatabaseError("Please complete all required selection fields.")
-    if license_issue_date >= license_expiry_date:
-        raise DatabaseError("License expiry date must be after the issue date.")
 
     rows = call_proc("sp_InsertShipper", (
         email, phone, password, date_of_birth, gender, first_name, last_name,
-        national_id, admin_id, license_number, license_type,
-        license_issue_date, license_expiry_date, brand, model, license_plate,
+        national_id, admin_id, license_number, license_type, brand, model, license_plate,
         color, maximum_load, vehicle_type,
     ))
     if not rows:

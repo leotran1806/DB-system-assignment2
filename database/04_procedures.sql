@@ -20,8 +20,6 @@ CREATE PROCEDURE sp_InsertShipper(
     IN p_ManagedByAdminID INT,
     IN p_LicenseNumber VARCHAR(12),
     IN p_LicenseType VARCHAR(5),
-    IN p_LicenseIssueDate DATE,
-    IN p_LicenseExpiryDate DATE,
     IN p_Brand VARCHAR(50),
     IN p_Model VARCHAR(50),
     IN p_LicensePlate VARCHAR(15),
@@ -99,18 +97,6 @@ BEGIN
     IF p_LicenseType IS NULL OR p_LicenseType NOT IN ('A1', 'A2', 'B1', 'B2', 'C') THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Licence type must be A1, A2, B1, B2 or C.';
     END IF;
-    IF p_LicenseIssueDate IS NULL OR p_LicenseExpiryDate IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Licence issue date and expiry date must be provided.';
-    END IF;
-    IF p_LicenseExpiryDate <= p_LicenseIssueDate THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Licence expiry date must be after the issue date.';
-    END IF;
-    IF p_LicenseIssueDate > CURDATE() THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The driving licence issue date cannot be in the future.';
-    END IF;
-    IF p_LicenseExpiryDate < CURDATE() THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The driving licence has expired.';
-    END IF;
 
     -- ===== Validation: vehicle =====
     IF p_VehicleType IS NULL OR p_VehicleType NOT IN ('motorbike', 'car', 'van', 'truck') THEN
@@ -156,8 +142,8 @@ BEGIN
                          JoinDate, ManagedByAdminID)
     VALUES (v_NewUserID, p_NationalIdentificationNumber, 'offline', CURDATE(), p_ManagedByAdminID);
 
-    INSERT INTO SHIPPER_LICENSE (ShipperID, LicenseNumber, LicenseType, IssueDate, ExpiryDate)
-    VALUES (v_NewUserID, p_LicenseNumber, p_LicenseType, p_LicenseIssueDate, p_LicenseExpiryDate);
+    INSERT INTO SHIPPER_LICENSE (ShipperID, LicenseNumber, LicenseType)
+    VALUES (v_NewUserID, p_LicenseNumber, p_LicenseType);
 
     INSERT INTO VEHICLE (ShipperID, Brand, Model, LicensePlate, Color, MaximumLoad, VehicleType)
     VALUES (v_NewUserID, TRIM(p_Brand), TRIM(p_Model), p_LicensePlate, TRIM(p_Color),

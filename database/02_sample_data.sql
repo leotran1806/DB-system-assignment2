@@ -90,18 +90,18 @@ INSERT INTO SHIPPER (UserID, NationalIdentificationNumber, AvailabilityStatus, J
 (91210, '038090012310', 'offline',   '2025-07-09', 91103);
 
 -- SHIPPER_LICENSE (11 rows). Shipper 91206 holds 2 licences; licence of 91204 is expired.
-INSERT INTO SHIPPER_LICENSE (ShipperID, LicenseNumber, LicenseType, IssueDate, ExpiryDate) VALUES
-(91201, '790116000001', 'A1', '2021-05-10', '2031-05-10'),
-(91202, '790117000002', 'A2', '2020-08-15', '2030-08-15'),
-(91203, '790118000003', 'A1', '2019-02-20', '2029-02-20'),
-(91204, '790119000004', 'A1', '2018-06-01', '2026-06-01'),
-(91205, '790120000005', 'A2', '2022-01-12', '2032-01-12'),
-(91206, '790121000006', 'B1', '2020-09-09', '2030-09-09'),
-(91206, '790121000016', 'A1', '2019-04-04', '2029-04-04'),
-(91207, '790122000007', 'B2', '2021-11-30', '2031-11-30'),
-(91208, '790123000008', 'B2', '2020-03-18', '2030-03-18'),
-(91209, '790124000009', 'C',  '2019-07-22', '2029-07-22'),
-(91210, '790125000010', 'A1', '2018-10-05', '2028-10-05');
+INSERT INTO SHIPPER_LICENSE (ShipperID, LicenseNumber, LicenseType) VALUES
+(91201, '790116000001', 'A1'),
+(91202, '790117000002', 'A2'),
+(91203, '790118000003', 'A1'),
+(91204, '790119000004', 'A1'),
+(91205, '790120000005', 'A2'),
+(91206, '790121000006', 'B1'),
+(91206, '790121000016', 'A1'),
+(91207, '790122000007', 'B2'),
+(91208, '790123000008', 'B2'),
+(91209, '790124000009', 'C'),
+(91210, '790125000010', 'A1');
 
 -- VEHICLE (9 rows). One vehicle per shipper; shipper 91210 has no vehicle.
 INSERT INTO VEHICLE (VehicleID, ShipperID, Brand, Model, LicensePlate, Color, MaximumLoad, VehicleType) VALUES
@@ -174,15 +174,15 @@ INSERT INTO `PACKAGE` (PackageID, OrderID, PackageDescription, PackageCategory, 
 
 -- 10) DELIVERY_ASSIGNMENT — one completed/active assignment per applicable order.
 -- VehicleID belongs to the shipper recorded in each row.
-INSERT INTO DELIVERY_ASSIGNMENT (OrderID, AssignmentNo, ShipperID, VehicleID, AssignedDate, AcceptedDate, CompleteDate, AssignmentStatus, RejectionReason) VALUES
-(92002, 1, 91201, 1, '2026-11-01 08:45:00', '2026-11-01 09:00:00', NULL, 'accepted', NULL),
-(92003, 1, 91203, 3, '2026-11-01 09:30:00', '2026-11-01 09:45:00', NULL, 'accepted', NULL),
-(92004, 1, 91201, 1, '2026-11-01 09:00:00', '2026-11-01 09:10:00', '2026-11-01 11:00:00', 'completed', NULL),
-(92006, 1, 91202, 2, '2026-11-02 09:00:00', '2026-11-02 09:10:00', '2026-11-02 11:30:00', 'completed', NULL),
-(92007, 1, 91203, 3, '2026-11-02 10:00:00', '2026-11-02 10:10:00', '2026-11-02 13:45:00', 'completed', NULL),
-(92008, 1, 91204, 4, '2026-11-03 14:20:00', '2026-11-03 14:30:00', '2026-11-03 16:00:00', 'completed', NULL),
-(92009, 1, 91206, 6, '2026-11-04 08:20:00', '2026-11-04 08:30:00', '2026-11-04 10:00:00', 'completed', NULL),
-(92010, 1, 91202, 2, '2026-11-04 13:20:00', '2026-11-04 13:30:00', '2026-11-04 15:30:00', 'completed', NULL);
+INSERT INTO DELIVERY_ASSIGNMENT (OrderID, AssignmentNo, ShipperID, AssignedDate, AcceptedDate, CompleteDate, AssignmentStatus, RejectionReason) VALUES
+(92002, 1, 91201, '2026-11-01 08:45:00', '2026-11-01 09:00:00', NULL, 'accepted', NULL),
+(92003, 1, 91203, '2026-11-01 09:30:00', '2026-11-01 09:45:00', NULL, 'accepted', NULL),
+(92004, 1, 91201, '2026-11-01 09:00:00', '2026-11-01 09:10:00', '2026-11-01 11:00:00', 'completed', NULL),
+(92006, 1, 91202, '2026-11-02 09:00:00', '2026-11-02 09:10:00', '2026-11-02 11:30:00', 'completed', NULL),
+(92007, 1, 91203, '2026-11-02 10:00:00', '2026-11-02 10:10:00', '2026-11-02 13:45:00', 'completed', NULL),
+(92008, 1, 91204, '2026-11-03 14:20:00', '2026-11-03 14:30:00', '2026-11-03 16:00:00', 'completed', NULL),
+(92009, 1, 91206, '2026-11-04 08:20:00', '2026-11-04 08:30:00', '2026-11-04 10:00:00', 'completed', NULL),
+(92010, 1, 91202, '2026-11-04 13:20:00', '2026-11-04 13:30:00', '2026-11-04 15:30:00', 'completed', NULL);
 --
 -- 11: Duy — requires USER IDs 91001..91005 from group A.
 INSERT INTO ORDER_STATUS_LOG (StatusLogID,OrderID,ChangedByUserID,Status,ChangedDate,Note) VALUES
