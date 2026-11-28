@@ -425,7 +425,6 @@ CREATE TABLE SHIPPER_EARNING (
     OrderID            INT           NOT NULL,
     DeliveryFee        DECIMAL(15,2) NOT NULL,
     PlatformCommission DECIMAL(15,2) NOT NULL,
-    NetEarning         DECIMAL(15,2) GENERATED ALWAYS AS (DeliveryFee - PlatformCommission) STORED,
     EarningDate        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PayoutStatus       VARCHAR(20)   NOT NULL DEFAULT 'pending',
     PayoutDate         DATETIME      NULL,
