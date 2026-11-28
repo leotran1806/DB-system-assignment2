@@ -254,7 +254,6 @@ CREATE TABLE DELIVERY_ASSIGNMENT (
     OrderID          INT          NOT NULL,
     AssignmentNo     INT          NOT NULL,
     ShipperID        INT          NOT NULL,
-    VehicleID        INT          NOT NULL,
     AssignedDate     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     AcceptedDate     DATETIME     NULL,
     CompleteDate     DATETIME     NULL,
@@ -262,11 +261,9 @@ CREATE TABLE DELIVERY_ASSIGNMENT (
     RejectionReason  VARCHAR(500) NULL,
     CONSTRAINT pk_delivery_assignment PRIMARY KEY (OrderID, AssignmentNo),
     CONSTRAINT fk_assignment_order FOREIGN KEY (OrderID)
-        REFERENCES DELIVERY_ORDER (OrderID) ON DELETE RESTRICT ON UPDATE CASCADE,
+        REFERENCES DELIVERY_ORDER (OrderID) ON DELETE ON UPDATE CASCADE,
     CONSTRAINT fk_assignment_shipper FOREIGN KEY (ShipperID)
-        REFERENCES SHIPPER (UserID) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT fk_assignment_vehicle_shipper FOREIGN KEY (VehicleID, ShipperID)
-        REFERENCES VEHICLE (VehicleID, ShipperID) ON DELETE RESTRICT ON UPDATE CASCADE,
+        REFERENCES SHIPPER (UserID) ON DELETE ON UPDATE CASCADE,
     CONSTRAINT chk_assignment_no CHECK (AssignmentNo > 0),
     CONSTRAINT chk_assignment_accepted_date
         CHECK (AcceptedDate IS NULL OR AcceptedDate >= AssignedDate),
